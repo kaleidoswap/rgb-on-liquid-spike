@@ -1,0 +1,17 @@
+/target
+/out/*
+!/out/.gitkeep
+**/*.rs.bk
+Cargo.lock.bak
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Docker volume data
+/data/
+docker/data/
+
+# Local env overrides
+.env
+.env.local

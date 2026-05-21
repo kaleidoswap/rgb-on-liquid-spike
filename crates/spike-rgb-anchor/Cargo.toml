@@ -1,0 +1,38 @@
+[package]
+name         = "spike-rgb-anchor"
+description  = "M2: build an MPC commitment with commit_verify, anchor it to a Liquid tx."
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+
+[dependencies]
+spike-env          = { path = "../spike-env" }
+spike-tapret       = { path = "../spike-tapret" }
+
+# The "rgb-protocol" 0.11 stack. The workspace's [patch.crates-io]
+# redirects rgb-consensus to our vendored patched copy.
+rgb-consensus       = { version = "0.11.1-rc.10" }
+rgb-strict-encoding = { version = "1.0.1" }
+rgb-strict-types    = { version = "1.0.1" }
+rgb-ops             = { version = "0.11.1-rc.10" }
+rgb-schemas         = { version = "0.11.1-rc.10" }
+amplify             = "=4.8.1"
+# rust-elements: build + serialize Elements (Liquid) txs for the M8
+# cross-chain atomic swap hashlock spends.
+elements            = "0.26"
+bech32              = "0.11"
+
+anyhow             = { workspace = true }
+hex                = { workspace = true }
+clap               = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+tokio              = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[[bin]]
+name = "rgb-anchor"
+path = "src/bin/rgb_anchor.rs"

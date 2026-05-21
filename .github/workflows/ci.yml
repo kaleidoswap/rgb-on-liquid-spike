@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+
+      # fmt + clippy cover the project's own crates. The vendored
+      # rgb-consensus copy keeps upstream's code style and is checked
+      # only by build + test.
+      - name: cargo fmt --check
+        run: cargo fmt --check -p spike-env -p spike-tapret -p spike-rgb-anchor
+
+      - name: cargo clippy
+        run: cargo clippy --no-deps -p spike-env -p spike-tapret -p spike-rgb-anchor --all-targets -- -D warnings
+
+      - name: cargo build
+        run: cargo build --workspace --all-targets
+
+      - name: cargo test
+        run: cargo test --workspace

@@ -1,0 +1,64 @@
+# Liquid regtest for the RGB-on-Liquid spike.
+#
+# We use elementsd RPC directly (getrawtransaction etc.) and skip electrs to
+# avoid the image-availability headache. The Esplora HTTP API is convenient
+# but adds nothing the RPC doesn't already give us for this spike.
+#
+# Bring up:    docker compose up -d
+# Tear down:   docker compose down -v
+
+services:
+  elementsd:
+    image: ghcr.io/vulpemventures/elements:23.2.4
+    container_name: spike-elementsd
+    restart: unless-stopped
+    ports:
+      - "7041:7041"   # RPC
+    volumes:
+      - ./docker/elements.conf:/home/elements/.elements/elements.conf:ro
+      - elementsd-data:/home/elements/.elements
+    command:
+      - -conf=/home/elements/.elements/elements.conf
+      - -datadir=/home/elements/.elements
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - elements-cli -chain=elementsregtest -rpcuser=user -rpcpassword=pass getblockchaininfo > /dev/null 2>&1
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  # Bitcoin Core regtest — the other leg of the M8 cross-chain RGB
+  # atomic swap. RGB anchors on Bitcoin exactly as on Liquid (the P2TR
+  # scriptPubKey byte format is identical).
+  bitcoind:
+    image: bitcoin/bitcoin:28.0
+    container_name: spike-bitcoind
+    restart: unless-stopped
+    ports:
+      - "18443:18443"   # regtest RPC
+    command:
+      - -regtest
+      - -server
+      - -txindex
+      - -fallbackfee=0.0002
+      - -rpcuser=user
+      - -rpcpassword=pass
+      - -rpcbind=0.0.0.0
+      - -rpcallowip=0.0.0.0/0
+      - -printtoconsole
+    volumes:
+      - bitcoind-data:/home/bitcoin/.bitcoin
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bitcoin-cli -regtest -rpcuser=user -rpcpassword=pass getblockchaininfo > /dev/null 2>&1
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+volumes:
+  elementsd-data:
+  bitcoind-data:
