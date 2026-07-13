@@ -24,11 +24,11 @@
 //! implementation differ, so this module carries one script builder
 //! and two per-chain spend builders.
 //!
-//! The spend builders accept an optional **anchor output** (scriptPubKey
-//! + value) inserted at vout 0. That is what lets the claim transaction
-//! itself carry an RGB tapret commitment — i.e. the claim *is* the
-//! witness transaction of the next RGB transition, re-anchoring the
-//! swapped asset to a seal the claimer controls.
+//! The spend builders accept an optional **anchor output** (a
+//! scriptPubKey and value) inserted at vout 0. That is what lets the
+//! claim transaction itself carry an RGB tapret commitment — i.e. the
+//! claim *is* the witness transaction of the next RGB transition,
+//! re-anchoring the swapped asset to a seal the claimer controls.
 
 use anyhow::{Context, Result};
 use rgbcore::bitcoin::hashes::{sha256, Hash};
@@ -354,7 +354,11 @@ mod tests {
         assert_eq!(push_script_num(1), vec![0x51]);
         assert_eq!(push_script_num(16), vec![0x60]);
         assert_eq!(push_script_num(17), vec![0x01, 0x11]);
-        assert_eq!(push_script_num(144), vec![0x02, 0x90, 0x00], "0x90 needs sign byte");
+        assert_eq!(
+            push_script_num(144),
+            vec![0x02, 0x90, 0x00],
+            "0x90 needs sign byte"
+        );
         assert_eq!(push_script_num(600), vec![0x02, 0x58, 0x02]);
     }
 
@@ -402,7 +406,9 @@ mod tests {
             99_000,
             &dest,
             &ws,
-            HtlcSpend::Claim { preimage: b"htlc-secret" },
+            HtlcSpend::Claim {
+                preimage: b"htlc-secret",
+            },
             5,
             &claim_sk,
             None,
@@ -446,7 +452,9 @@ mod tests {
             &dest,
             lbtc,
             &ws,
-            HtlcSpend::Claim { preimage: b"htlc-secret" },
+            HtlcSpend::Claim {
+                preimage: b"htlc-secret",
+            },
             5,
             &claim_sk,
             None,
@@ -462,7 +470,9 @@ mod tests {
             &dest,
             lbtc,
             &ws,
-            HtlcSpend::Claim { preimage: b"htlc-secret" },
+            HtlcSpend::Claim {
+                preimage: b"htlc-secret",
+            },
             5,
             &claim_sk,
             None,

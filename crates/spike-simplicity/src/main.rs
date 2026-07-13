@@ -30,6 +30,16 @@ use elements::secp256k1_zkp as secp256k1;
 /// BIP-341 NUMS point — no known discrete log, so no key-path spend.
 const NUMS_KEY: &str = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0";
 
+/// The RGB `opret` anchor shape the covenant enforces at output 0:
+/// `OP_RETURN OP_PUSHBYTES_32 <payload>`.
+fn opret_spk(payload: &[u8; 32]) -> Vec<u8> {
+    let mut spk = Vec::with_capacity(34);
+    spk.push(0x6a); // OP_RETURN
+    spk.push(0x20); // OP_PUSHBYTES_32
+    spk.extend_from_slice(payload);
+    spk
+}
+
 #[derive(Parser)]
 #[command(about = "Drive a SimplicityHL program on Liquid regtest")]
 struct Cli {
@@ -88,8 +98,8 @@ enum Cmd {
 }
 
 fn compile(program_path: &str, args_path: &str) -> Result<CompiledProgram> {
-    let src = std::fs::read_to_string(program_path)
-        .with_context(|| format!("read {program_path}"))?;
+    let src =
+        std::fs::read_to_string(program_path).with_context(|| format!("read {program_path}"))?;
     let template = TemplateProgram::new(src, Box::new(ElementsJetHinter::new()))
         .map_err(|e| anyhow::anyhow!("parse: {e}"))?;
     let args: Arguments = serde_json::from_str(
@@ -195,12 +205,11 @@ fn main() -> Result<()> {
 
             let mut output = Vec::new();
             if let Some(payload_hex) = &opret_payload {
-                let payload = hex::decode(payload_hex).context("opret payload hex")?;
-                anyhow::ensure!(payload.len() == 32, "opret payload must be 32 bytes");
-                let mut spk = Vec::with_capacity(34);
-                spk.push(0x6a); // OP_RETURN
-                spk.push(0x20); // OP_PUSHBYTES_32
-                spk.extend_from_slice(&payload);
+                let payload: [u8; 32] = hex::decode(payload_hex)
+                    .context("opret payload hex")?
+                    .try_into()
+                    .map_err(|_| anyhow::anyhow!("opret payload must be 32 bytes"))?;
+                let spk = opret_spk(&payload);
                 output.push(TxOut {
                     asset: lbtc,
                     value: Value::Explicit(0),
@@ -288,5 +297,84 @@ fn main() -> Result<()> {
             println!("{}", hex::encode(elements::encode::serialize(&tx)));
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HASH_A: &str = "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925";
+    const HASH_B: &str = "0000000000000000000000000000000000000000000000000000000000000001";
+
+    fn program_path() -> String {
+        format!(
+            "{}/programs/rgb_anchor_covenant.simf",
+            env!("CARGO_MANIFEST_DIR")
+        )
+    }
+
+    fn compile_with_hash(hash: &str) -> CompiledProgram {
+        let args = format!(r#"{{ "EXPECTED_HASH": {{ "value": "0x{hash}", "type": "u256" }} }}"#);
+        let dir = std::env::temp_dir().join(format!("simp-test-args-{hash}.json"));
+        std::fs::write(&dir, args).unwrap();
+        compile(&program_path(), dir.to_str().unwrap()).expect("covenant program compiles")
+    }
+
+    #[test]
+    fn opret_spk_is_anchor_shaped() {
+        let payload = [0xabu8; 32];
+        let spk = opret_spk(&payload);
+        assert_eq!(spk.len(), 34);
+        assert_eq!(spk[0], 0x6a, "OP_RETURN");
+        assert_eq!(spk[1], 0x20, "OP_PUSHBYTES_32");
+        assert_eq!(&spk[2..], &payload);
+    }
+
+    #[test]
+    fn bundled_covenant_compiles_and_cmr_is_deterministic() {
+        let a1 = compile_with_hash(HASH_A);
+        let a2 = compile_with_hash(HASH_A);
+        assert_eq!(
+            a1.commit().cmr(),
+            a2.commit().cmr(),
+            "same program + same argument must give the same CMR"
+        );
+    }
+
+    #[test]
+    fn hash_argument_is_baked_into_the_cmr() {
+        let a = compile_with_hash(HASH_A);
+        let b = compile_with_hash(HASH_B);
+        assert_ne!(
+            a.commit().cmr(),
+            b.commit().cmr(),
+            "a different hashlock must change the CMR (and thus the address)"
+        );
+    }
+
+    #[test]
+    fn taproot_parts_are_wellformed() {
+        let parts = taproot_parts(&compile_with_hash(HASH_A)).unwrap();
+        // 32-byte CMR is the whole leaf script
+        assert_eq!(parts.leaf_script.as_bytes(), parts.cmr.as_ref());
+        // P2TR scriptPubKey: OP_1 PUSH32 <output key>
+        let spk = parts.spk.as_bytes();
+        assert_eq!(spk.len(), 34);
+        assert_eq!(spk[0], 0x51);
+        assert_eq!(spk[1], 0x20);
+        // single-leaf control block: 1 version+parity byte + 32-byte internal key
+        assert_eq!(parts.control_block.serialize().len(), 33);
+        // simplicity tapleaf version
+        assert_eq!(parts.control_block.leaf_version.as_u8(), 0xbe);
+        // regtest HRP
+        assert!(parts.address.to_string().starts_with("ert1p"));
+    }
+
+    #[test]
+    fn addresses_differ_per_hashlock() {
+        let a = taproot_parts(&compile_with_hash(HASH_A)).unwrap();
+        let b = taproot_parts(&compile_with_hash(HASH_B)).unwrap();
+        assert_ne!(a.address.to_string(), b.address.to_string());
     }
 }

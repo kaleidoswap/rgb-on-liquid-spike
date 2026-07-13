@@ -52,7 +52,14 @@ echo "  hashlock @ Liquid     : $HL_LQ_ADDR"
 echo
 echo "════════ LEG 1 — Bitcoin (kLUSD) ════════"
 
-ALICE_UTXO=$(bcli_w w_btc listunspent 1 | jq -r '[.[] | select(.amount > 1)][0]')
+# Pick a plain v0-segwit coin: taproot inputs sign with Schnorr and the
+# raw signer here only does ECDSA, so a tr() UTXO would die at broadcast.
+ALICE_UTXO=$(bcli_w w_btc listunspent 1 \
+  | jq -r '[.[] | select(.amount > 1 and .spendable and (.address | startswith("bcrt1q")))][0]')
+if [ "$ALICE_UTXO" = "null" ] || [ -z "$ALICE_UTXO" ]; then
+  echo "✗ no suitable BTC UTXO (plain bcrt1q, >1 BTC) in w_btc — re-run bootstrap_btc.sh" >&2
+  exit 1
+fi
 ALICE_SEAL_TXID=$(echo "$ALICE_UTXO" | jq -r '.txid')
 ALICE_SEAL_VOUT=$(echo "$ALICE_UTXO" | jq -r '.vout')
 echo "  alice seal : $ALICE_SEAL_TXID:$ALICE_SEAL_VOUT"
@@ -85,7 +92,17 @@ jq --arg t "$LEG1_TXID" '.txid=$t' "$OUT_DIR/swap_leg1.json" > "$OUT_DIR/swap_le
 echo
 echo "════════ LEG 2 — Liquid (kXAU) ════════"
 
-BOB_UTXO=$(ecli_w w_b listunspent 1 | jq -r '[.[] | select(.asset=="'"$LBTC"'")][0]')
+# Explicit (unblinded) v0-segwit L-BTC only: a blinded or taproot coin
+# breaks the unblinded fundrawtransaction/sign path with an invalid
+# Schnorr signature on wallets that accumulated state across demo runs.
+BOB_UTXO=$(ecli_w w_b listunspent 1 \
+  | jq -r '[.[] | select(.asset=="'"$LBTC"'"
+      and (.amountblinder == "0000000000000000000000000000000000000000000000000000000000000000")
+      and (.address | startswith("ert1q")))][0]')
+if [ "$BOB_UTXO" = "null" ] || [ -z "$BOB_UTXO" ]; then
+  echo "✗ no explicit (unblinded) ert1q L-BTC UTXO in w_b — re-run bootstrap.sh from a clean stack" >&2
+  exit 1
+fi
 BOB_SEAL_TXID=$(echo "$BOB_UTXO" | jq -r '.txid')
 BOB_SEAL_VOUT=$(echo "$BOB_UTXO" | jq -r '.vout')
 echo "  bob seal   : $BOB_SEAL_TXID:$BOB_SEAL_VOUT"

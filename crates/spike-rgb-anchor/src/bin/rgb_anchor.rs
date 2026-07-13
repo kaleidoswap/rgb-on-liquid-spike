@@ -484,10 +484,9 @@ fn htlc_spend(
     let preimage_bytes;
     let (spend, signer_sk) = match branch {
         "claim" => {
-            preimage_bytes = hex::decode(
-                preimage_hex.context("--preimage is required for the claim branch")?,
-            )
-            .context("preimage hex")?;
+            preimage_bytes =
+                hex::decode(preimage_hex.context("--preimage is required for the claim branch")?)
+                    .context("preimage hex")?;
             (
                 HtlcSpend::Claim {
                     preimage: &preimage_bytes,

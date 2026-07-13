@@ -29,10 +29,10 @@ jobs:
       # rgb-consensus copy keeps upstream's code style and is checked
       # only by build + test.
       - name: cargo fmt --check
-        run: cargo fmt --check -p spike-env -p spike-tapret -p spike-rgb-anchor
+        run: cargo fmt --check -p spike-env -p spike-tapret -p spike-rgb-anchor -p spike-simplicity
 
       - name: cargo clippy
-        run: cargo clippy --no-deps -p spike-env -p spike-tapret -p spike-rgb-anchor --all-targets -- -D warnings
+        run: cargo clippy --no-deps -p spike-env -p spike-tapret -p spike-rgb-anchor -p spike-simplicity --all-targets -- -D warnings
 
       - name: cargo build
         run: cargo build --workspace --all-targets
