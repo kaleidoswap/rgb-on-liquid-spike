@@ -15,8 +15,24 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
 
 - A real RGB20 (NIA) asset issued and transferred on Liquid, anchored in a
   Liquid transaction and verified by the patched `rgb-consensus`.
+- The same transfer with **confidential outputs**: the closed seal, the new
+  seal, and the change are all blinded, and the unchanged verifiers still
+  recover and verify the commitment (the commitment lives in the
+  scriptPubKey, which Elements never blinds).
 - A cross-chain atomic swap: a real RGB20 asset on Bitcoin and one on Liquid,
   exchanged through a shared hashlock, with no custodian.
+- A **full HTLC** (claimer key + CSV refund branch) exercised on both chains
+  with the same witness-script bytes — claim, wrong-preimage rejection,
+  early-refund rejection, and post-timeout refund.
+- An **RGB-wrapped HTLC claim**: the HTLC UTXO *is* the RGB seal, so one
+  transaction reveals the swap preimage, closes the seal, and carries the
+  tapret anchor that re-seats the asset on the claimer's own output.
+- A **Simplicity covenant** on Liquid regtest (Elements 23.3, tapleaf 0xbe):
+  a seal UTXO that consensus only lets you spend by revealing a preimage
+  AND carrying an RGB-`opret`-shaped commitment output at vout 0 — the
+  `preimage(H) ∧ valid_rgb_anchor` construction, in running code. A spend
+  stripped of its anchor output is rejected by the chain itself, not by
+  tooling.
 - The patch itself: `rgb-consensus` 0.11.1-rc.10 plus a `WitnessTx` trait,
   vendored under `vendor/rgb-consensus-patched/`. The upstream test suite
   passes unchanged (45/45), and `rgb-ops`, `rgb-schemas`, `rgb-invoicing`, and
@@ -27,13 +43,15 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
 ```
 .
 ├── RFC.md                      the proposed upstream change
-├── docker-compose.yml          elementsd + bitcoind regtest
+├── docker-compose.yml          elementsd (23.2.4 + 23.3.0/Simplicity) + bitcoind regtest
 ├── docker/elements.conf        Liquid regtest config
+├── docker/elements-simplicity.conf  Elements 23.3 config, Simplicity active
 ├── scripts/                    regtest bootstrap, end-to-end demos, teardown
 ├── crates/
 │   ├── spike-env/              minimal JSON-RPC client for elementsd / bitcoind
 │   ├── spike-tapret/           BIP-341 tweak math + P2TR address encoding
-│   └── spike-rgb-anchor/       MPC tree, tapret commit/verify, RGB20, atomic swap
+│   ├── spike-rgb-anchor/       MPC tree, tapret commit/verify, RGB20, swap + HTLC
+│   └── spike-simplicity/       SimplicityHL covenant + taproot(0xbe) driver
 └── vendor/
     └── rgb-consensus-patched/  rgb-consensus 0.11.1-rc.10 + the WitnessTx patch
 ```
@@ -52,7 +70,11 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/bootstrap_btc.sh      # fund the Bitcoin wallet
 
 ./scripts/demo_rgb20.sh         # RGB20 issuance + transfer on Liquid
+./scripts/demo_confidential.sh  # the same, with blinded (confidential) outputs
 ./scripts/demo_swap.sh          # cross-chain Bitcoin <-> Liquid atomic swap
+./scripts/demo_htlc.sh          # full HTLC (claim + CSV refund) on both chains
+./scripts/demo_htlc_rgb.sh      # RGB-wrapped HTLC claim (seal = HTLC UTXO)
+./scripts/demo_simplicity.sh    # Simplicity covenant: preimage ∧ anchor-shaped output
 
 ./scripts/teardown.sh           # stop the nodes and wipe state
 ```
@@ -60,6 +82,9 @@ docker compose up -d            # start elementsd + bitcoind regtest
 Two narrower demos are also available: `./scripts/demo_rgb.sh` (a multi-entry
 MPC anchor) and `./scripts/demo_seal.sh` (seal-closure verification, with
 negative tests).
+
+Note: the demos accumulate wallet state; for a clean run start from
+`docker compose down -v` and re-bootstrap.
 
 ## Tests
 
@@ -76,6 +101,27 @@ cargo test -p rgb-consensus --features rand    # 45 upstream rgb-consensus tests
 for the file-by-file change, and [RFC.md](RFC.md) for the rationale and the
 open questions for upstream maintainers.
 
+## The Simplicity covenant
+
+`crates/spike-simplicity/programs/rgb_anchor_covenant.simf` is, to our
+knowledge, the first combination of client-side-validation anchoring with a
+Simplicity covenant on the seal UTXO. The program (SimplicityHL, deployed as
+a taproot leaf with version 0xbe) enforces two conditions on any spend:
+
+1. `SHA256(witness::PREIMAGE) == param::EXPECTED_HASH` — the atomic-swap
+   hashlock, with the hash baked into the CMR and therefore the address;
+2. output 0 of the spending transaction has a scriptPubKey of exactly
+   `OP_RETURN OP_PUSHBYTES_32 <32 bytes>` — the shape of an RGB `opret`
+   commitment. The spender supplies the 32-byte payload (the MPC root) as
+   witness; the program reconstructs the expected scriptPubKey hash and
+   compares it against `jet::output_script_hash(0)`.
+
+Script cannot see sibling outputs; Simplicity's introspection jets can. The
+demo proves enforcement is consensus-level: a transaction satisfied against
+a compliant layout and then stripped of its anchor output is rejected by the
+node. The claim key/refund branch of a production HTLC is deliberately left
+out of the spike program; `demo_htlc.sh` covers that shape in Script.
+
 ## Next steps
 
 This is a proof of concept on regtest, not a product. Shipping it takes:
@@ -86,8 +132,12 @@ This is a proof of concept on regtest, not a product. Shipping it takes:
   Esplora.
 - **A Liquid backend for `rgb-lib`**, exposing the same issue / send / receive
   API the Bitcoin path already provides.
-- **A swap coordinator** that hardens the cross-chain hashlock into a full
-  Hash Time-Locked Contract with timeouts and a refund branch.
+- **A swap coordinator** around the HTLC + RGB-wrapped-claim flow that this
+  repo now demonstrates end to end (timeout selection, refund monitoring,
+  consignment exchange).
+- **Hardening the Simplicity covenant** into the full swap program (claimer
+  signature, CSV refund branch, tapret support) as the SimplicityHL
+  toolchain matures.
 
 None of these are research problems.
 

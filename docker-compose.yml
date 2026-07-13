@@ -29,6 +29,30 @@ services:
       retries: 30
       start_period: 5s
 
+  # Elements >= 23.3 with the Simplicity deployment force-activated —
+  # used ONLY by the Simplicity spike (scripts/demo_simplicity*.sh).
+  # A separate node so the RGB demos stay pinned to 23.2.4.
+  elementsd-simplicity:
+    image: ghcr.io/vulpemventures/elements:23.3.0
+    container_name: spike-elementsd-simplicity
+    restart: unless-stopped
+    ports:
+      - "7042:7042"   # RPC
+    volumes:
+      - ./docker/elements-simplicity.conf:/home/elements/.elements/elements.conf:ro
+      - elementsd-simplicity-data:/home/elements/.elements
+    command:
+      - -conf=/home/elements/.elements/elements.conf
+      - -datadir=/home/elements/.elements
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - elements-cli -chain=elementsregtest -rpcuser=user -rpcpassword=pass -rpcport=7042 getblockchaininfo > /dev/null 2>&1
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
   # Bitcoin Core regtest — the other leg of the M8 cross-chain RGB
   # atomic swap. RGB anchors on Bitcoin exactly as on Liquid (the P2TR
   # scriptPubKey byte format is identical).
@@ -37,7 +61,7 @@ services:
     container_name: spike-bitcoind
     restart: unless-stopped
     ports:
-      - "18443:18443"   # regtest RPC
+      - "18543:18443"   # regtest RPC (host 18543; 18443 is often taken by other local stacks)
     command:
       - -regtest
       - -server
@@ -61,4 +85,5 @@ services:
 
 volumes:
   elementsd-data:
+  elementsd-simplicity-data:
   bitcoind-data:

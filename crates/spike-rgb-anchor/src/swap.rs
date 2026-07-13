@@ -68,6 +68,7 @@ pub fn hashlock_address(network_hrp: &str, hash: &[u8; 32]) -> Result<String> {
 
 pub mod bitcoin_leg;
 pub mod elements_leg;
+pub mod htlc;
 
 /// Verify that a preimage matches a hash — used by the counterparty
 /// after extracting the preimage from the first leg's claim tx.

@@ -15,6 +15,7 @@ pub mod defaults {
     pub const ELEMENTSD_RPC_USER: &str = "user";
     pub const ELEMENTSD_RPC_PASS: &str = "pass";
 
-    /// Bitcoin Core regtest RPC.
-    pub const BITCOIND_RPC_URL: &str = "http://localhost:18443";
+    /// Bitcoin Core regtest RPC (host port 18543 → container 18443; see
+    /// docker-compose.yml — 18443 is often taken by other local stacks).
+    pub const BITCOIND_RPC_URL: &str = "http://localhost:18543";
 }

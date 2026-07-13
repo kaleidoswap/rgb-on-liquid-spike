@@ -3,6 +3,7 @@ members  = [
     "crates/spike-tapret",
     "crates/spike-env",
     "crates/spike-rgb-anchor",
+    "crates/spike-simplicity",
     "vendor/rgb-consensus-patched",
 ]
 resolver = "2"

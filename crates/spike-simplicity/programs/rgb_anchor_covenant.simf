@@ -1,0 +1,43 @@
+/*
+ * RGB ANCHOR COVENANT — "preimage(H) ∧ anchor-shaped output"
+ *
+ * A Simplicity covenant for an RGB seal UTXO on Liquid. The coin can
+ * only be spent by a transaction that:
+ *
+ *   1. reveals the preimage of a hash (the atomic-swap link), AND
+ *   2. carries, at output 0, an OP_RETURN output of exactly the shape
+ *      of an RGB `opret` commitment: `OP_RETURN OP_PUSHBYTES_32 <32B>`.
+ *
+ * (2) is the covenant: the CHAIN ITSELF refuses any spend of the seal
+ * whose transaction does not carry an RGB-anchor-shaped commitment
+ * output. Script cannot see sibling outputs; Simplicity's introspection
+ * jets can.
+ *
+ * How the shape check works: `jet::output_script_hash(0)` returns the
+ * SHA256 of output 0's scriptPubKey. The spender supplies the 32-byte
+ * commitment payload as witness; the program reconstructs the expected
+ * scriptPubKey hash by hashing `0x6a20 || payload` (OP_RETURN,
+ * OP_PUSHBYTES_32, payload) and requires it to equal the actual output
+ * hash. The payload itself is free (it is the RGB MPC root, chosen at
+ * spend time); the SHAPE is enforced.
+ *
+ * The hash lock (EXPECTED_HASH) is a compile-time parameter, so it is
+ * baked into the program's CMR and therefore into the address.
+ */
+
+fn main() {
+    // 1) Hashlock: SHA256(witness::PREIMAGE) == EXPECTED_HASH.
+    let hasher: Ctx8 = jet::sha_256_ctx_8_init();
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_32(hasher, witness::PREIMAGE);
+    let hash: u256 = jet::sha_256_ctx_8_finalize(hasher);
+    assert!(jet::eq_256(hash, param::EXPECTED_HASH));
+
+    // 2) Anchor covenant: output 0 must be `OP_RETURN OP_PUSHBYTES_32 <payload>`.
+    let prefix: u16 = 0x6a20; // OP_RETURN, OP_PUSHBYTES_32
+    let hasher: Ctx8 = jet::sha_256_ctx_8_init();
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_2(hasher, prefix);
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_32(hasher, witness::ANCHOR_PAYLOAD);
+    let expected_spk_hash: u256 = jet::sha_256_ctx_8_finalize(hasher);
+    let actual_spk_hash: u256 = unwrap(jet::output_script_hash(0));
+    assert!(jet::eq_256(actual_spk_hash, expected_spk_hash));
+}

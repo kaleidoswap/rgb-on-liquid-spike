@@ -23,6 +23,8 @@ amplify             = "=4.8.1"
 # cross-chain atomic swap hashlock spends.
 elements            = "0.26"
 bech32              = "0.11"
+# HTLC spend signing (same secp256k1 the bitcoin/elements crates use).
+secp256k1           = "0.29"
 
 anyhow             = { workspace = true }
 hex                = { workspace = true }

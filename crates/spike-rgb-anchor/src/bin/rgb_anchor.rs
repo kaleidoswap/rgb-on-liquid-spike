@@ -161,6 +161,102 @@ enum Cmd {
         #[arg(long)]
         preimage: String,
     },
+
+    /// Derive a full-HTLC P2WSH address (claim branch = preimage +
+    /// claimer key; refund branch = CSV delay + refund key). Demo keys
+    /// are derived from labels: sk = SHA256(label).
+    HtlcAddress {
+        /// SHA256 hash locking the claim branch (32-byte hex).
+        #[arg(long)]
+        hash: String,
+        /// Label for the claimer demo key.
+        #[arg(long)]
+        claimer: String,
+        /// Label for the refund demo key.
+        #[arg(long)]
+        refund: String,
+        /// CSV delay (relative blocks) on the refund branch.
+        #[arg(long, default_value_t = 5)]
+        csv_delay: u32,
+        /// Address HRP: `bcrt` (Bitcoin regtest) or `ert` (Liquid regtest).
+        #[arg(long)]
+        hrp: String,
+    },
+
+    /// Build + sign the Bitcoin tx spending an HTLC UTXO (claim or
+    /// refund branch). Prints raw tx hex.
+    HtlcSpendBtc {
+        #[arg(long)]
+        prev_txid: String,
+        #[arg(long)]
+        prev_vout: u32,
+        #[arg(long)]
+        input_value_sat: u64,
+        #[arg(long, default_value_t = 500)]
+        fee_sat: u64,
+        /// Destination scriptPubKey hex.
+        #[arg(long)]
+        dest_spk: String,
+        /// The hash the HTLC script was built with (32-byte hex).
+        #[arg(long)]
+        hash: String,
+        #[arg(long)]
+        claimer: String,
+        #[arg(long)]
+        refund: String,
+        #[arg(long, default_value_t = 5)]
+        csv_delay: u32,
+        /// `claim` or `refund`.
+        #[arg(long)]
+        branch: String,
+        /// Preimage hex (claim branch only; may deliberately mismatch
+        /// `--hash` for negative tests).
+        #[arg(long)]
+        preimage: Option<String>,
+        /// Optional anchor output (e.g. a tapret SPK) placed at vout 0.
+        #[arg(long)]
+        anchor_spk: Option<String>,
+        #[arg(long, default_value_t = 500)]
+        anchor_value_sat: u64,
+    },
+
+    /// Build + sign the Elements/Liquid tx spending an HTLC UTXO
+    /// (claim or refund branch). Prints raw tx hex.
+    HtlcSpendLiquid {
+        #[arg(long)]
+        prev_txid: String,
+        #[arg(long)]
+        prev_vout: u32,
+        #[arg(long)]
+        input_value_sat: u64,
+        #[arg(long, default_value_t = 500)]
+        fee_sat: u64,
+        #[arg(long)]
+        dest_spk: String,
+        #[arg(
+            long,
+            default_value = "b2e15d0d7a0c94e4e2ce0fe6e8691b9e451377f6e46e8045a86f7c4b5d4f0f23"
+        )]
+        lbtc_asset: String,
+        #[arg(long)]
+        hash: String,
+        #[arg(long)]
+        claimer: String,
+        #[arg(long)]
+        refund: String,
+        #[arg(long, default_value_t = 5)]
+        csv_delay: u32,
+        /// `claim` or `refund`.
+        #[arg(long)]
+        branch: String,
+        #[arg(long)]
+        preimage: Option<String>,
+        /// Optional anchor output (e.g. a tapret SPK) placed at vout 0.
+        #[arg(long)]
+        anchor_spk: Option<String>,
+        #[arg(long, default_value_t = 500)]
+        anchor_value_sat: u64,
+    },
 }
 
 #[tokio::main]
@@ -248,7 +344,204 @@ async fn main() -> Result<()> {
             &lbtc_asset,
             &preimage,
         ),
+        Cmd::HtlcAddress {
+            hash,
+            claimer,
+            refund,
+            csv_delay,
+            hrp,
+        } => htlc_address(&hash, &claimer, &refund, csv_delay, &hrp),
+        Cmd::HtlcSpendBtc {
+            prev_txid,
+            prev_vout,
+            input_value_sat,
+            fee_sat,
+            dest_spk,
+            hash,
+            claimer,
+            refund,
+            csv_delay,
+            branch,
+            preimage,
+            anchor_spk,
+            anchor_value_sat,
+        } => htlc_spend(
+            Chain::Bitcoin,
+            &prev_txid,
+            prev_vout,
+            input_value_sat,
+            fee_sat,
+            &dest_spk,
+            None,
+            &hash,
+            &claimer,
+            &refund,
+            csv_delay,
+            &branch,
+            preimage.as_deref(),
+            anchor_spk.as_deref(),
+            anchor_value_sat,
+        ),
+        Cmd::HtlcSpendLiquid {
+            prev_txid,
+            prev_vout,
+            input_value_sat,
+            fee_sat,
+            dest_spk,
+            lbtc_asset,
+            hash,
+            claimer,
+            refund,
+            csv_delay,
+            branch,
+            preimage,
+            anchor_spk,
+            anchor_value_sat,
+        } => htlc_spend(
+            Chain::Liquid,
+            &prev_txid,
+            prev_vout,
+            input_value_sat,
+            fee_sat,
+            &dest_spk,
+            Some(&lbtc_asset),
+            &hash,
+            &claimer,
+            &refund,
+            csv_delay,
+            &branch,
+            preimage.as_deref(),
+            anchor_spk.as_deref(),
+            anchor_value_sat,
+        ),
     }
+}
+
+enum Chain {
+    Bitcoin,
+    Liquid,
+}
+
+fn htlc_address(
+    hash_hex: &str,
+    claimer_label: &str,
+    refund_label: &str,
+    csv_delay: u32,
+    hrp: &str,
+) -> Result<()> {
+    use spike_rgb_anchor::swap::htlc;
+    let hash: [u8; 32] = hex::decode(hash_hex)
+        .context("hash hex")?
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("hash must be 32 bytes"))?;
+    let (_, claimer_pk) = htlc::demo_keypair(claimer_label)?;
+    let (_, refund_pk) = htlc::demo_keypair(refund_label)?;
+    let ws = htlc::htlc_witness_script(&hash, &claimer_pk, &refund_pk, csv_delay);
+    println!(
+        "{}",
+        serde_json::json!({
+            "hash_hex": hash_hex,
+            "address": htlc::p2wsh_address(hrp, &ws)?,
+            "spk_hex": hex::encode(htlc::p2wsh_spk(&ws)),
+            "witness_script_hex": hex::encode(&ws),
+            "claimer_pk": hex::encode(claimer_pk),
+            "refund_pk": hex::encode(refund_pk),
+            "csv_delay": csv_delay,
+        })
+    );
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn htlc_spend(
+    chain: Chain,
+    prev_txid: &str,
+    prev_vout: u32,
+    input_value_sat: u64,
+    fee_sat: u64,
+    dest_spk_hex: &str,
+    lbtc_asset: Option<&str>,
+    hash_hex: &str,
+    claimer_label: &str,
+    refund_label: &str,
+    csv_delay: u32,
+    branch: &str,
+    preimage_hex: Option<&str>,
+    anchor_spk_hex: Option<&str>,
+    anchor_value_sat: u64,
+) -> Result<()> {
+    use spike_rgb_anchor::swap::htlc::{self, AnchorOut, HtlcSpend};
+
+    let hash: [u8; 32] = hex::decode(hash_hex)
+        .context("hash hex")?
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("hash must be 32 bytes"))?;
+    let dest_spk = hex::decode(dest_spk_hex).context("dest_spk hex")?;
+    let (claimer_sk, claimer_pk) = htlc::demo_keypair(claimer_label)?;
+    let (refund_sk, refund_pk) = htlc::demo_keypair(refund_label)?;
+    let ws = htlc::htlc_witness_script(&hash, &claimer_pk, &refund_pk, csv_delay);
+
+    let preimage_bytes;
+    let (spend, signer_sk) = match branch {
+        "claim" => {
+            preimage_bytes = hex::decode(
+                preimage_hex.context("--preimage is required for the claim branch")?,
+            )
+            .context("preimage hex")?;
+            (
+                HtlcSpend::Claim {
+                    preimage: &preimage_bytes,
+                },
+                claimer_sk,
+            )
+        }
+        "refund" => (HtlcSpend::Refund, refund_sk),
+        other => anyhow::bail!("--branch must be `claim` or `refund`, got `{other}`"),
+    };
+
+    let anchor = anchor_spk_hex
+        .map(|s| -> Result<AnchorOut> {
+            Ok(AnchorOut {
+                spk: hex::decode(s).context("anchor_spk hex")?,
+                value_sat: anchor_value_sat,
+            })
+        })
+        .transpose()?;
+    let anchor_total = anchor.as_ref().map(|a| a.value_sat).unwrap_or(0);
+    let output_value = input_value_sat
+        .checked_sub(fee_sat + anchor_total)
+        .context("fee + anchor exceed input value")?;
+
+    let raw = match chain {
+        Chain::Bitcoin => htlc::build_htlc_spend_btc(
+            prev_txid,
+            prev_vout,
+            input_value_sat,
+            output_value,
+            &dest_spk,
+            &ws,
+            spend,
+            csv_delay,
+            &signer_sk,
+            anchor,
+        )?,
+        Chain::Liquid => htlc::build_htlc_spend_liquid(
+            prev_txid,
+            prev_vout,
+            input_value_sat,
+            output_value,
+            fee_sat,
+            &dest_spk,
+            lbtc_asset.context("lbtc_asset required for Liquid")?,
+            &ws,
+            spend,
+            csv_delay,
+            &signer_sk,
+            anchor,
+        )?,
+    };
+    println!("{raw}");
+    Ok(())
 }
 
 fn swap_hashlock(preimage_hex: &str, hrp: &str) -> Result<()> {

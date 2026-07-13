@@ -1,0 +1,22 @@
+[package]
+name         = "spike-simplicity"
+description  = "Simplicity spike: HTLC + anchor-shaped-output covenant on Liquid regtest."
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+
+[dependencies]
+simplicityhl    = "0.6"
+# Same underlying simplicity crate the compiler uses (lib name `simplicity`);
+# elements is taken via simplicityhl's re-export to guarantee one version.
+simplicity-lang = "0.8"
+anyhow       = { workspace = true }
+hex          = { workspace = true }
+serde_json   = { workspace = true }
+clap         = { workspace = true }
+
+[[bin]]
+name = "simp"
+path = "src/main.rs"
