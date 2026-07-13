@@ -2,7 +2,7 @@
 
 **Target:** [`rgb-protocol/rgb-consensus`](https://github.com/rgb-protocol/rgb-consensus) (`rgbcore` v0.11.1-rc.10)
 **From:** KaleidoSwap engineering
-**Status:** Draft for maintainer review. The patch is implemented and the upstream test suite passes; it is staged as a pull request on a fork and has not been submitted upstream.
+**Status:** Submitted upstream as [rgb-protocol/rgb-consensus#12](https://github.com/rgb-protocol/rgb-consensus/issues/12). The patch is implemented and the upstream test suite passes.
 
 ## The ask
 
