@@ -1,0 +1,44 @@
+/*
+ * TIME-LOCKED STAKING COVENANT.
+ *
+ * Locks a staked RGB position (the seal holding the principal) until an
+ * absolute maturity height, and binds the principal to return to the
+ * staker. Consensus enforces all of it; no key sits in the path.
+ *
+ * A spend of the staked seal is accepted only if:
+ *
+ *   1. the maturity height has passed  (BIP-65 style absolute lock),
+ *   2. output 0 is the RGB opret anchor for the unstake transition
+ *      (OP_RETURN OP_PUSHBYTES_32 <root>), so the return is anchored,
+ *   3. output 1 pays the staker's script — the principal can only go
+ *      back to the staker, so the position is keyless yet safe: anyone
+ *      may trigger the unstake after maturity, but the funds are the
+ *      staker's.
+ *
+ * The covenant enforces the *lock and the destination* (the container).
+ * The reward — new units issued to the staker for having locked — is an
+ * RGB issuance layered on top (it composes with the mint-gate covenant),
+ * and its binding to lock duration lives in client-side validation, not
+ * here: the chain cannot read RGB amounts.
+ */
+
+fn main() {
+    // 1. Maturity: the unstake transaction's locktime must be at or past
+    //    the maturity height. Consensus additionally refuses to mine it
+    //    before that height, so together this is a real time lock.
+    jet::check_lock_height(param::MATURITY_HEIGHT);
+
+    // 2. Output 0 is the RGB opret anchor: OP_RETURN || PUSH32 || root.
+    let prefix: u16 = 0x6a20;
+    let hasher: Ctx8 = jet::sha_256_ctx_8_init();
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_2(hasher, prefix);
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_32(hasher, witness::ANCHOR_PAYLOAD);
+    let anchor_spk_hash: u256 = jet::sha_256_ctx_8_finalize(hasher);
+    assert!(jet::eq_256(unwrap(jet::output_script_hash(0)), anchor_spk_hash));
+
+    // 3. Output 1 returns the principal to the staker.
+    assert!(jet::eq_256(
+        unwrap(jet::output_script_hash(1)),
+        param::STAKER_SPK_HASH,
+    ));
+}

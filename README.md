@@ -49,6 +49,12 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
   (`demo_mint_gate_burn.sh`) replaces the vault with a provable burn: a single
   OP_RETURN output is both the RGB anchor and the destruction of the backing
   tranche, so there is no vault and no key, at the cost of redeemability.
+- A **time-locked staking covenant** (`demo_staking.sh`): a staked RGB
+  position that consensus locks until a maturity height and binds to return
+  to the staker. It cannot be unstaked early (absolute time lock), redirected
+  away from the staker, or spent without anchoring the return transition.
+  Keyless: after maturity anyone may trigger the unstake, but the principal
+  goes home.
 - The patch itself: `rgb-consensus` 0.11.1-rc.10 plus a `WitnessTx` trait,
   vendored under `vendor/rgb-consensus-patched/`. The upstream test suite
   passes unchanged (45/45), and `rgb-ops`, `rgb-schemas`, `rgb-invoicing`, and
@@ -94,6 +100,7 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/demo_simplicity.sh    # Simplicity covenant: preimage ∧ anchor-shaped output
 ./scripts/demo_mint_gate.sh     # Simplicity mint-gate (lock): permissionless backed minting
 ./scripts/demo_mint_gate_burn.sh # Simplicity mint-gate (burn): mint against a provable burn
+./scripts/demo_staking.sh       # Simplicity time-locked staking covenant
 
 ./scripts/teardown.sh           # stop the nodes and wipe state
 ```

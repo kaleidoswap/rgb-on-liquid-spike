@@ -277,6 +277,51 @@ enum Cmd {
         #[arg(long, default_value = "none")]
         tamper: String,
     },
+    /// Unstake: spend a time-locked staking covenant UTXO. Output 0 is
+    /// the opret anchor for the return transition, output 1 returns the
+    /// principal to the staker. The tx locktime is set to the maturity
+    /// height; consensus refuses it earlier.
+    UnstakeSpend {
+        #[arg(long)]
+        program: String,
+        #[arg(long)]
+        args: String,
+        #[arg(long)]
+        anchor_payload: String,
+        /// Staked covenant UTXO being spent (vin 0).
+        #[arg(long)]
+        stake_txid: String,
+        #[arg(long)]
+        stake_vout: u32,
+        #[arg(long)]
+        stake_value_sat: u64,
+        /// L-BTC fee UTXO (vin 1), paying the demo key's P2WPKH.
+        #[arg(long)]
+        fee_txid: String,
+        #[arg(long)]
+        fee_vout: u32,
+        #[arg(long)]
+        fee_input_sat: u64,
+        #[arg(long, default_value = "poker")]
+        key_label: String,
+        /// Staker scriptPubKey hex the principal must return to (output 1).
+        #[arg(long)]
+        staker_spk: String,
+        #[arg(long, default_value_t = 15_000)]
+        principal_sat: u64,
+        /// Absolute maturity height (set as the tx locktime).
+        #[arg(long)]
+        maturity_height: u32,
+        #[arg(long, default_value_t = 1_000)]
+        fee_sat: u64,
+        #[arg(long)]
+        lbtc_asset: String,
+        #[arg(long)]
+        genesis_hash: String,
+        /// `none`, `drop-anchor`, `wrong-dest`.
+        #[arg(long, default_value = "none")]
+        tamper: String,
+    },
 }
 
 fn compile(program_path: &str, args_path: &str) -> Result<CompiledProgram> {
@@ -784,6 +829,136 @@ fn main() -> Result<()> {
                 parts.control_block.serialize(),
             ];
             sign_p2wpkh_inputs(&mut tx, &[(1, tranche), (2, fee_input_sat)], &sk, &pk);
+
+            println!("{}", hex::encode(elements::encode::serialize(&tx)));
+            Ok(())
+        }
+        Cmd::UnstakeSpend {
+            program,
+            args,
+            anchor_payload,
+            stake_txid,
+            stake_vout,
+            stake_value_sat,
+            fee_txid,
+            fee_vout,
+            fee_input_sat,
+            key_label,
+            staker_spk,
+            principal_sat,
+            maturity_height,
+            fee_sat,
+            lbtc_asset,
+            genesis_hash,
+            tamper,
+        } => {
+            use elements::confidential::{Asset, Nonce, Value};
+            use elements::{
+                AssetId, LockTime, OutPoint, Script, Sequence, Transaction, TxIn, TxInWitness,
+                TxOut, TxOutWitness,
+            };
+
+            let compiled = compile(&program, &args)?;
+            let parts = taproot_parts(&compiled)?;
+            let (sk, pk) = demo_keypair(&key_label)?;
+            let funding_spk = Script::from(p2wpkh_spk(&pk));
+
+            let payload = hex::decode(&anchor_payload).context("anchor payload hex")?;
+            anyhow::ensure!(payload.len() == 32, "anchor payload must be 32 bytes");
+            let mut opret = Vec::with_capacity(34);
+            opret.push(0x6a);
+            opret.push(0x20);
+            opret.extend_from_slice(&payload);
+
+            let lbtc: AssetId = lbtc_asset.parse().context("lbtc asset id")?;
+            let genesis: elements::BlockHash = genesis_hash.parse().context("genesis hash")?;
+            let staker = hex::decode(&staker_spk).context("staker spk hex")?;
+
+            let change_sat = (stake_value_sat + fee_input_sat)
+                .checked_sub(principal_sat + fee_sat)
+                .context("inputs too small for principal + fee")?;
+
+            // The staked input must enable locktime (sequence < final).
+            let stake_in = TxIn {
+                previous_output: OutPoint::new(stake_txid.parse()?, stake_vout),
+                is_pegin: false,
+                script_sig: Script::new(),
+                sequence: Sequence::from_consensus(0xffff_fffe),
+                asset_issuance: Default::default(),
+                witness: TxInWitness::default(),
+            };
+            let fee_in = TxIn {
+                previous_output: OutPoint::new(fee_txid.parse()?, fee_vout),
+                is_pegin: false,
+                script_sig: Script::new(),
+                sequence: Sequence::from_consensus(0xffff_fffe),
+                asset_issuance: Default::default(),
+                witness: TxInWitness::default(),
+            };
+            let out = |sat: u64, spk: Script| TxOut {
+                asset: Asset::Explicit(lbtc),
+                value: Value::Explicit(sat),
+                nonce: Nonce::Null,
+                script_pubkey: spk,
+                witness: TxOutWitness::default(),
+            };
+
+            let mut tx = Transaction {
+                version: 2,
+                lock_time: LockTime::from_height(maturity_height).context("maturity height")?,
+                input: vec![stake_in, fee_in],
+                output: vec![
+                    out(0, Script::from(opret)),              // 0: opret anchor
+                    out(principal_sat, Script::from(staker)), // 1: principal to staker
+                    out(change_sat, funding_spk.clone()),     // 2: fee change
+                    out(fee_sat, Script::new()),              // 3: fee
+                ],
+            };
+
+            let utxos = vec![
+                ElementsUtxo {
+                    script_pubkey: parts.spk.clone(),
+                    asset: Asset::Explicit(lbtc),
+                    value: Value::Explicit(stake_value_sat),
+                },
+                ElementsUtxo {
+                    script_pubkey: funding_spk.clone(),
+                    asset: Asset::Explicit(lbtc),
+                    value: Value::Explicit(fee_input_sat),
+                },
+            ];
+            let env = ElementsEnv::new(
+                Arc::new(tx.clone()),
+                utxos,
+                0,
+                parts.cmr,
+                parts.control_block.clone(),
+                None,
+                genesis,
+            );
+            let witness_values: WitnessValues = serde_json::from_str(&format!(
+                r#"{{ "ANCHOR_PAYLOAD": {{ "value": "0x{anchor_payload}", "type": "u256" }} }}"#
+            ))
+            .context("witness values")?;
+            let satisfied = compiled
+                .satisfy_with_env(witness_values, Some(&env))
+                .map_err(|e| anyhow::anyhow!("satisfy: {e}"))?;
+            let (prog_bytes, wit_bytes) = satisfied.redeem().to_vec_with_witness();
+
+            match tamper.as_str() {
+                "none" => {}
+                "drop-anchor" => tx.output[0].script_pubkey = funding_spk.clone(),
+                "wrong-dest" => tx.output[1].script_pubkey = funding_spk.clone(),
+                other => anyhow::bail!("unknown tamper mode: {other}"),
+            }
+
+            tx.input[0].witness.script_witness = vec![
+                wit_bytes,
+                prog_bytes,
+                parts.leaf_script.clone().into_bytes(),
+                parts.control_block.serialize(),
+            ];
+            sign_p2wpkh_inputs(&mut tx, &[(1, fee_input_sat)], &sk, &pk);
 
             println!("{}", hex::encode(elements::encode::serialize(&tx)));
             Ok(())
