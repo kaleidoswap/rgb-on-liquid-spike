@@ -1,0 +1,54 @@
+/*
+ * MINT-GATE COVENANT (BURN variant) — permissionless minting backed by
+ * a provable burn instead of a vault lock.
+ *
+ * Same idea as mint_gate_covenant.simf, but the backing is *destroyed*
+ * rather than held. On Elements an asset is burned by sending it to an
+ * OP_RETURN output, which is unspendable, and that output still names
+ * its asset and amount explicitly. So a single output can do two jobs
+ * at once:
+ *
+ *   output 0  is BOTH the RGB `opret` anchor AND the asset burn:
+ *             scriptPubKey = OP_RETURN OP_PUSHBYTES_32 <32-byte root>,
+ *             asset        = BACKING_ASSET,
+ *             amount       = TRANCHE.
+ *
+ *   output 2  re-creates this covenant for the next minter (recursion).
+ *
+ * Output 1 (the recipient's new seal) is unconstrained.
+ *
+ * Versus the lock variant this removes the vault entirely: no vault
+ * script, no vault custody covenant, no key that can ever move the
+ * backing. Proof-of-reserves becomes proof-of-burn, monotonic and
+ * irreversible. The trade is economic, not technical: a burn returns
+ * nothing, so this mints a one-way migration, not a redeemable wrapper.
+ */
+
+fn main() {
+    // Output 0 is the RGB opret anchor: OP_RETURN || PUSH32 || root.
+    let prefix: u16 = 0x6a20;
+    let hasher: Ctx8 = jet::sha_256_ctx_8_init();
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_2(hasher, prefix);
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_32(hasher, witness::ANCHOR_PAYLOAD);
+    let anchor_spk_hash: u256 = jet::sha_256_ctx_8_finalize(hasher);
+    assert!(jet::eq_256(unwrap(jet::output_script_hash(0)), anchor_spk_hash));
+
+    // The very same output burns exactly TRANCHE of BACKING_ASSET.
+    // OP_RETURN makes it unspendable, so those units are destroyed.
+    // Asset and amount must be explicit: a burn is publicly auditable.
+    let (asset, amount): (Asset1, Amount1) = unwrap(jet::output_amount(0));
+    match asset {
+        Left(_: (u1, u256)) => panic!(), // blinded asset: not auditable
+        Right(id: u256) => assert!(jet::eq_256(id, param::BACKING_ASSET)),
+    };
+    match amount {
+        Left(_: (u1, u256)) => panic!(), // blinded amount: not auditable
+        Right(value: u64) => assert!(jet::eq_64(value, param::TRANCHE)),
+    };
+
+    // Output 2 re-creates this covenant for the next minter.
+    assert!(jet::eq_256(
+        unwrap(jet::output_script_hash(2)),
+        jet::current_script_hash(),
+    ));
+}

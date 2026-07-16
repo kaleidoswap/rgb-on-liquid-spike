@@ -45,7 +45,10 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
   amount introspection jets), and re-creates the gate under the same
   covenant for the next minter (recursion). Two chained mints settle; spends
   that drop the anchor, short the backing, or skip the gate re-creation are
-  rejected by consensus (`demo_mint_gate.sh`).
+  rejected by consensus (`demo_mint_gate.sh`). A **burn variant**
+  (`demo_mint_gate_burn.sh`) replaces the vault with a provable burn: a single
+  OP_RETURN output is both the RGB anchor and the destruction of the backing
+  tranche, so there is no vault and no key, at the cost of redeemability.
 - The patch itself: `rgb-consensus` 0.11.1-rc.10 plus a `WitnessTx` trait,
   vendored under `vendor/rgb-consensus-patched/`. The upstream test suite
   passes unchanged (45/45), and `rgb-ops`, `rgb-schemas`, `rgb-invoicing`, and
@@ -89,7 +92,8 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/demo_htlc_rgb.sh      # RGB-wrapped HTLC claim (seal = HTLC UTXO)
 ./scripts/demo_backed_mint.sh   # IFA mint backed by a locked Elements asset
 ./scripts/demo_simplicity.sh    # Simplicity covenant: preimage ∧ anchor-shaped output
-./scripts/demo_mint_gate.sh     # Simplicity mint-gate: permissionless backed minting
+./scripts/demo_mint_gate.sh     # Simplicity mint-gate (lock): permissionless backed minting
+./scripts/demo_mint_gate_burn.sh # Simplicity mint-gate (burn): mint against a provable burn
 
 ./scripts/teardown.sh           # stop the nodes and wipe state
 ```
