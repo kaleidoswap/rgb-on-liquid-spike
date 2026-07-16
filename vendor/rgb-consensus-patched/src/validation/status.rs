@@ -96,7 +96,9 @@ impl AddAssign for Status {
 }
 
 impl Status {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_warning(&mut self, warning: impl Into<Warning>) -> &Self {
         self.warnings.push(warning.into());

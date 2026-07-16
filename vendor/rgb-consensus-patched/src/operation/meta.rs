@@ -62,14 +62,18 @@ mod _serde {
 
     impl Serialize for MetaValue {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+        where
+            S: Serializer,
+        {
             serializer.serialize_str(&self.to_string())
         }
     }
 
     impl<'de> Deserialize<'de> for MetaValue {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de> {
+        where
+            D: Deserializer<'de>,
+        {
             let s = String::deserialize(deserializer)?;
             Self::from_hex(&s).map_err(D::Error::custom)
         }
@@ -91,7 +95,9 @@ pub struct Metadata(TinyOrdMap<schema::MetaType, MetaValue>);
 impl CommitEncode for Metadata {
     type CommitmentId = StrictHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl DefaultBasedStrictDumb for Metadata {}
@@ -114,5 +120,7 @@ impl<'a> IntoIterator for &'a Metadata {
     type Item = (&'a schema::MetaType, &'a MetaValue);
     type IntoIter = btree_map::Iter<'a, schema::MetaType, MetaValue>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
 }

@@ -127,7 +127,9 @@ impl TryFrom<RangeInclusive<u16>> for Occurrences {
 impl DefaultBasedStrictDumb for Occurrences {}
 impl StrictType for Occurrences {
     const STRICT_LIB_NAME: &'static str = LIB_NAME_RGB_COMMIT;
-    fn strict_name() -> Option<TypeName> { Some(tn!("Occurrences")) }
+    fn strict_name() -> Option<TypeName> {
+        Some(tn!("Occurrences"))
+    }
 }
 impl StrictProduct for Occurrences {}
 impl StrictStruct for Occurrences {

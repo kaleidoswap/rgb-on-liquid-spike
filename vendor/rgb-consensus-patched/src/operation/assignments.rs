@@ -53,17 +53,22 @@ use crate::{
     )
 )]
 pub struct AssignVec<A>(NonEmptyVec<A, U16>)
-where A: StrictDumb + StrictEncode + StrictDecode;
+where
+    A: StrictDumb + StrictEncode + StrictDecode;
 
 impl<A: StrictDumb + StrictEncode + StrictDecode> AssignVec<A> {
-    pub fn with(vec: NonEmptyVec<A, U16>) -> Self { Self(vec) }
+    pub fn with(vec: NonEmptyVec<A, U16>) -> Self {
+        Self(vec)
+    }
 }
 
 impl<A: StrictDumb + StrictEncode + StrictDecode> IntoIterator for AssignVec<A> {
     type Item = A;
     type IntoIter = std::vec::IntoIter<A>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Display, Error)]
@@ -104,7 +109,9 @@ pub type RevealedAssign = Assign<RevealedState, BlindSeal<Txid>>;
 // here we use deterministic ordering based on hash values of the concealed
 // seal data contained within the assignment
 impl<State: ExposedState, Seal: ExposedSeal> PartialOrd for Assign<State, Seal> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl<State: ExposedState, Seal: ExposedSeal> Ord for Assign<State, Seal> {
@@ -115,7 +122,9 @@ impl<State: ExposedState, Seal: ExposedSeal> Ord for Assign<State, Seal> {
 }
 
 impl<State: ExposedState, Seal: ExposedSeal> Assign<State, Seal> {
-    pub fn revealed(seal: Seal, state: State) -> Self { Assign::Revealed { seal, state } }
+    pub fn revealed(seal: Seal, state: State) -> Self {
+        Assign::Revealed { seal, state }
+    }
 
     pub fn with_seal_replaced(assignment: &Self, seal: Seal) -> Self {
         match assignment {
@@ -183,7 +192,8 @@ impl<State: ExposedState, Seal: ExposedSeal> Assign<State, Seal> {
 }
 
 impl<State: ExposedState, Seal: ExposedSeal> Conceal for Assign<State, Seal>
-where Self: Clone
+where
+    Self: Clone,
 {
     type Concealed = Self;
 
@@ -286,13 +296,19 @@ impl<Seal: ExposedSeal> TypedAssigns<Seal> {
     }
 
     #[inline]
-    pub fn is_declarative(&self) -> bool { matches!(self, TypedAssigns::Declarative(_)) }
+    pub fn is_declarative(&self) -> bool {
+        matches!(self, TypedAssigns::Declarative(_))
+    }
 
     #[inline]
-    pub fn is_fungible(&self) -> bool { matches!(self, TypedAssigns::Fungible(_)) }
+    pub fn is_fungible(&self) -> bool {
+        matches!(self, TypedAssigns::Fungible(_))
+    }
 
     #[inline]
-    pub fn is_structured(&self) -> bool { matches!(self, TypedAssigns::Structured(_)) }
+    pub fn is_structured(&self) -> bool {
+        matches!(self, TypedAssigns::Structured(_))
+    }
 
     #[inline]
     pub fn as_declarative(&self) -> &[AssignRights<Seal>] {
@@ -532,12 +548,15 @@ impl TypedAssigns<GenesisSeal> {
     )
 )]
 pub struct Assignments<Seal>(SmallOrdMap<AssignmentType, TypedAssigns<Seal>>)
-where Seal: ExposedSeal;
+where
+    Seal: ExposedSeal;
 
 impl<Seal: ExposedSeal> DefaultBasedStrictDumb for Assignments<Seal> {}
 
 impl<Seal: ExposedSeal> Default for Assignments<Seal> {
-    fn default() -> Self { Self(empty!()) }
+    fn default() -> Self {
+        Self(empty!())
+    }
 }
 
 impl Assignments<GenesisSeal> {
@@ -553,7 +572,9 @@ impl<Seal: ExposedSeal> IntoIterator for Assignments<Seal> {
     type Item = (AssignmentType, TypedAssigns<Seal>);
     type IntoIter = btree_map::IntoIter<AssignmentType, TypedAssigns<Seal>>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, From)]
@@ -573,7 +594,9 @@ impl AssignmentsRef<'_> {
         }
     }
 
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     pub fn flat(&self) -> Assignments<GraphSeal> {
         match *self {

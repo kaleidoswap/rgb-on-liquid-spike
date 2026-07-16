@@ -109,17 +109,27 @@ impl<'op> Operation for OpRef<'op> {
 pub struct CheckedConsignment<'consignment, C: ConsignmentApi>(&'consignment C);
 
 impl<'consignment, C: ConsignmentApi> CheckedConsignment<'consignment, C> {
-    pub fn new(consignment: &'consignment C) -> Self { Self(consignment) }
+    pub fn new(consignment: &'consignment C) -> Self {
+        Self(consignment)
+    }
 }
 
 impl<C: ConsignmentApi> ConsignmentApi for CheckedConsignment<'_, C> {
-    fn schema(&self) -> &Schema { self.0.schema() }
+    fn schema(&self) -> &Schema {
+        self.0.schema()
+    }
 
-    fn types(&self) -> &TypeSystem { self.0.types() }
+    fn types(&self) -> &TypeSystem {
+        self.0.types()
+    }
 
-    fn scripts(&self) -> impl Iterator<Item = &Lib> { self.0.scripts() }
+    fn scripts(&self) -> impl Iterator<Item = &Lib> {
+        self.0.scripts()
+    }
 
-    fn genesis(&self) -> &Genesis { self.0.genesis() }
+    fn genesis(&self) -> &Genesis {
+        self.0.genesis()
+    }
 
     fn bundles_info(&self) -> impl Iterator<Item = (&TransitionBundle, &EAnchor, Txid)> {
         self.0.bundles_info()

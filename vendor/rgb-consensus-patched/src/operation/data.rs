@@ -38,8 +38,12 @@ pub struct VoidState(());
 impl DefaultBasedStrictDumb for VoidState {}
 
 impl ExposedState for VoidState {
-    fn state_type(&self) -> StateType { StateType::Void }
-    fn state_data(&self) -> RevealedState { RevealedState::Void }
+    fn state_type(&self) -> StateType {
+        StateType::Void
+    }
+    fn state_data(&self) -> RevealedState {
+        RevealedState::Void
+    }
 }
 
 #[derive(Wrapper, Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash, From, Display, Default)]
@@ -53,12 +57,18 @@ impl DefaultBasedStrictDumb for RevealedData {}
 
 impl RevealedData {
     /// Convenience constructor.
-    pub fn new(value: impl Into<SmallBlob>) -> Self { Self(value.into()) }
+    pub fn new(value: impl Into<SmallBlob>) -> Self {
+        Self(value.into())
+    }
 }
 
 impl ExposedState for RevealedData {
-    fn state_type(&self) -> StateType { StateType::Structured }
-    fn state_data(&self) -> RevealedState { RevealedState::Structured(self.clone()) }
+    fn state_type(&self) -> StateType {
+        StateType::Structured
+    }
+    fn state_data(&self) -> RevealedState {
+        RevealedState::Structured(self.clone())
+    }
 }
 
 #[cfg(feature = "serde")]
@@ -71,14 +81,18 @@ mod _serde {
 
     impl Serialize for RevealedData {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+        where
+            S: Serializer,
+        {
             serializer.serialize_str(&self.to_string())
         }
     }
 
     impl<'de> Deserialize<'de> for RevealedData {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de> {
+        where
+            D: Deserializer<'de>,
+        {
             let s = String::deserialize(deserializer)?;
             Self::from_hex(&s).map_err(D::Error::custom)
         }

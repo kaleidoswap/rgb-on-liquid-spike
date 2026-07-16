@@ -120,7 +120,9 @@ impl CommitEngine {
     }
 
     pub fn commit_to_merkle<T: MerkleLeaves>(&mut self, value: &T)
-    where T::Leaf: StrictType {
+    where
+        T::Leaf: StrictType,
+    {
         let fqn = commitment_fqn::<T::Leaf>();
         self.layout
             .push(CommitStep::Merklized(fqn))
@@ -199,13 +201,21 @@ impl CommitEngine {
         self.layout.as_ref()
     }
 
-    pub fn into_layout(self) -> TinyVec<CommitStep> { self.layout }
+    pub fn into_layout(self) -> TinyVec<CommitStep> {
+        self.layout
+    }
 
-    pub fn set_finished(&mut self) { self.finished = true; }
+    pub fn set_finished(&mut self) {
+        self.finished = true;
+    }
 
-    pub fn finish(self) -> Sha256 { self.hasher }
+    pub fn finish(self) -> Sha256 {
+        self.hasher
+    }
 
-    pub fn finish_layout(self) -> (Sha256, TinyVec<CommitStep>) { (self.hasher, self.layout) }
+    pub fn finish_layout(self) -> (Sha256, TinyVec<CommitStep>) {
+        (self.hasher, self.layout)
+    }
 }
 
 /// Prepares the data to the *consensus commit* procedure by first running
@@ -237,7 +247,8 @@ pub trait CommitmentLayout: CommitEncode {
 }
 
 impl<T> CommitmentLayout for T
-where T: CommitEncode + StrictDumb
+where
+    T: CommitEncode + StrictDumb,
 {
     fn commitment_layout() -> CommitLayout {
         let dumb = Self::strict_dumb();
@@ -279,7 +290,9 @@ impl<T: CommitEncode> CommitId for T {
         engine
     }
 
-    fn commit_id(&self) -> Self::CommitmentId { self.commit().finish().into() }
+    fn commit_id(&self) -> Self::CommitmentId {
+        self.commit().finish().into()
+    }
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
@@ -302,5 +315,7 @@ impl CommitmentId for StrictHash {
 }
 
 impl From<Sha256> for StrictHash {
-    fn from(hash: Sha256) -> Self { hash.finish().into() }
+    fn from(hash: Sha256) -> Self {
+        hash.finish().into()
+    }
 }

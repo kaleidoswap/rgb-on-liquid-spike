@@ -91,7 +91,9 @@ impl FromStr for TapretCommitment {
 
 impl TapretCommitment {
     /// Constructs information about tapret commitment.
-    pub fn with(mpc: mpc::Commitment, nonce: u8) -> Self { Self { mpc, nonce } }
+    pub fn with(mpc: mpc::Commitment, nonce: u8) -> Self {
+        Self { mpc, nonce }
+    }
 
     /// Tapret script consists of 29 `OP_RESERVED` pushes, followed by
     /// `OP_RETURN`, `OP_PUSHBYTES_33` and serialized commitment data (MPC
@@ -124,7 +126,9 @@ mod _serde {
 
     impl Serialize for TapretCommitment {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+        where
+            S: Serializer,
+        {
             if serializer.is_human_readable() {
                 self.to_string().serialize(serializer)
             } else {
@@ -135,7 +139,9 @@ mod _serde {
 
     impl<'de> Deserialize<'de> for TapretCommitment {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de> {
+        where
+            D: Deserializer<'de>,
+        {
             if deserializer.is_human_readable() {
                 let s = String::deserialize(deserializer)?;
                 Self::from_str(&s).map_err(D::Error::custom)

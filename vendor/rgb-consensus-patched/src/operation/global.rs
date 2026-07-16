@@ -42,18 +42,24 @@ use crate::{schema, RevealedData, LIB_NAME_RGB_COMMIT};
 pub struct GlobalValues(Confined<Vec<RevealedData>, 1, U16>);
 
 impl StrictDumb for GlobalValues {
-    fn strict_dumb() -> Self { Self(Confined::with(RevealedData::strict_dumb())) }
+    fn strict_dumb() -> Self {
+        Self(Confined::with(RevealedData::strict_dumb()))
+    }
 }
 
 impl GlobalValues {
-    pub fn with(state: RevealedData) -> Self { GlobalValues(Confined::with(state)) }
+    pub fn with(state: RevealedData) -> Self {
+        GlobalValues(Confined::with(state))
+    }
 }
 
 impl IntoIterator for GlobalValues {
     type Item = RevealedData;
     type IntoIter = vec::IntoIter<RevealedData>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
 }
 
 #[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, Hash, Default, Debug, From)]
@@ -100,5 +106,7 @@ impl<'a> IntoIterator for &'a GlobalState {
     type Item = (&'a schema::GlobalStateType, &'a GlobalValues);
     type IntoIter = btree_map::Iter<'a, schema::GlobalStateType, GlobalValues>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
 }

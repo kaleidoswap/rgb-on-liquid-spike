@@ -98,6 +98,19 @@ enum Cmd {
         /// must equal supply.
         #[arg(long)]
         change_seal: Option<String>,
+        /// For CHAINED transfers: OpId (hex) of the transition whose
+        /// allocation is consumed. Default: the contract genesis.
+        #[arg(long)]
+        consume_opid: Option<String>,
+        /// For chained transfers: the amount carried by the consumed
+        /// allocation (opout index 0). Default: `--supply`.
+        #[arg(long)]
+        prev_amount: Option<u64>,
+        /// For chained transfers: the outpoint the consumed allocation
+        /// sits on (the seal this witness tx must close). Default:
+        /// `--alice-seal`.
+        #[arg(long)]
+        close_seal: Option<String>,
         /// X-only internal key (32 bytes hex).
         #[arg(
             long,
@@ -414,6 +427,9 @@ async fn main() -> Result<()> {
             alice_seal,
             bob_seal,
             change_seal,
+            consume_opid,
+            prev_amount,
+            close_seal,
             internal_key,
             entropy,
             chain_net,
@@ -425,6 +441,9 @@ async fn main() -> Result<()> {
             &alice_seal,
             &bob_seal,
             change_seal.as_deref(),
+            consume_opid.as_deref(),
+            prev_amount,
+            close_seal.as_deref(),
             &internal_key,
             entropy,
             &chain_net,
@@ -818,6 +837,9 @@ fn rgb20_transfer(
     alice_seal_s: &str,
     bob_seal_s: &str,
     change_seal_s: Option<&str>,
+    consume_opid_s: Option<&str>,
+    prev_amount: Option<u64>,
+    close_seal_s: Option<&str>,
     internal_key_hex: &str,
     entropy: u64,
     chain_net_s: &str,
@@ -826,6 +848,10 @@ fn rgb20_transfer(
     let alice_seal = parse_outpoint(alice_seal_s)?;
     let bob_seal = parse_outpoint(bob_seal_s)?;
     let change_seal = change_seal_s.map(parse_outpoint).transpose()?;
+    let close_seal = close_seal_s
+        .map(parse_outpoint)
+        .transpose()?
+        .unwrap_or(alice_seal);
     let chain_net = parse_chain_net(chain_net_s)?;
     // P2TR address HRP depends on the chain.
     let hrp = match chain_net {
@@ -847,9 +873,22 @@ fn rgb20_transfer(
     eprintln!(" alice seal  : {}:{}", alice_seal.txid, alice_seal.vout);
     eprintln!(" supply      : {} {}", supply, ticker);
 
-    // Step 2: real transfer transition.
-    let (bundle_id, transition) =
-        rgb20::build_transfer(issuance.contract_id, supply, send, bob_seal, change_seal, 0)?;
+    // Step 2: real transfer transition (genesis-consuming or chained).
+    let (bundle_id, transition) = match consume_opid_s {
+        Some(op) => rgb20::build_transfer_from(
+            issuance.contract_id,
+            rgbcore::OpId::from(parse32(op, "consume_opid")?),
+            0,
+            prev_amount.unwrap_or(supply),
+            send,
+            bob_seal,
+            change_seal,
+            0,
+        )?,
+        None => {
+            rgb20::build_transfer(issuance.contract_id, supply, send, bob_seal, change_seal, 0)?
+        }
+    };
     eprintln!(" bundle_id   : {}", hex::encode(bundle_id.to_byte_array()));
     eprintln!(
         " transition  : {} (consumes 1 input, creates {} assignments)",
@@ -896,8 +935,8 @@ fn rgb20_transfer(
     eprintln!("──────────────────────────────────────────────────────────");
 
     let anchor_seal = LiquidSeal {
-        txid: format!("{}", alice_seal.txid),
-        vout: alice_seal.vout,
+        txid: format!("{}", close_seal.txid),
+        vout: close_seal.vout,
     };
     let anchor = LiquidAnchor {
         txid: String::new(),
@@ -916,6 +955,9 @@ fn rgb20_transfer(
 
     println!("{addr}");
     println!("{}", serde_json::to_string(&anchor)?);
+    // Third stdout line: this transition's OpId, so a chained transfer
+    // can consume the allocation it created (`--consume-opid`).
+    println!("{}", hex::encode(transition.commit_id().to_byte_array()));
     Ok(())
 }
 

@@ -74,7 +74,9 @@ impl ExposedSeal for BlindSeal<TxPtr> {
 }
 
 impl ExposedSeal for BlindSeal<Txid> {
-    fn with_witness_id(self, _witness_id: Option<Txid>) -> Option<BlindSeal<Txid>> { Some(self) }
+    fn with_witness_id(self, _witness_id: Option<Txid>) -> Option<BlindSeal<Txid>> {
+        Some(self)
+    }
 }
 
 #[cfg(test)]

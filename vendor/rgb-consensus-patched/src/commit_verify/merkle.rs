@@ -66,7 +66,9 @@ pub struct MerkleNode {
 impl CommitEncode for MerkleNode {
     type CommitmentId = MerkleHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl MerkleNode {
@@ -128,7 +130,9 @@ impl CommitmentId for MerkleHash {
 }
 
 impl From<Sha256> for MerkleHash {
-    fn from(hash: Sha256) -> Self { hash.finish().into() }
+    fn from(hash: Sha256) -> Self {
+        hash.finish().into()
+    }
 }
 
 const VIRTUAL_LEAF: MerkleHash = MerkleHash(Bytes32::from_array([0xFF; 32]));
@@ -208,75 +212,100 @@ impl MerkleHash {
 pub trait MerkleLeaves {
     type Leaf: CommitId<CommitmentId = MerkleHash>;
     type LeafIter<'tmp>: ExactSizeIterator<Item = Self::Leaf>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
     fn merkle_leaves(&self) -> Self::LeafIter<'_>;
 }
 
 impl<T, const MIN: usize> MerkleLeaves for Confined<Vec<T>, MIN, { u8::MAX as usize }>
-where T: CommitId<CommitmentId = MerkleHash> + Copy
+where
+    T: CommitId<CommitmentId = MerkleHash> + Copy,
 {
     type Leaf = T;
     type LeafIter<'tmp>
         = iter::Copied<slice::Iter<'tmp, T>>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.iter().copied() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.iter().copied()
+    }
 }
 
 impl<T: Ord, const MIN: usize> MerkleLeaves for Confined<BTreeSet<T>, MIN, { u8::MAX as usize }>
-where T: CommitId<CommitmentId = MerkleHash> + Copy
+where
+    T: CommitId<CommitmentId = MerkleHash> + Copy,
 {
     type Leaf = T;
     type LeafIter<'tmp>
         = iter::Copied<btree_set::Iter<'tmp, T>>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.iter().copied() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.iter().copied()
+    }
 }
 
 impl<T, const MIN: usize> MerkleLeaves for Confined<Vec<T>, MIN, { u16::MAX as usize }>
-where T: CommitId<CommitmentId = MerkleHash> + Copy
+where
+    T: CommitId<CommitmentId = MerkleHash> + Copy,
 {
     type Leaf = T;
     type LeafIter<'tmp>
         = iter::Copied<slice::Iter<'tmp, T>>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.iter().copied() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.iter().copied()
+    }
 }
 
 impl<T: Ord, const MIN: usize> MerkleLeaves for Confined<BTreeSet<T>, MIN, { u16::MAX as usize }>
-where T: CommitId<CommitmentId = MerkleHash> + Copy
+where
+    T: CommitId<CommitmentId = MerkleHash> + Copy,
 {
     type Leaf = T;
     type LeafIter<'tmp>
         = iter::Copied<btree_set::Iter<'tmp, T>>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.iter().copied() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.iter().copied()
+    }
 }
 
 impl<T, const MIN: usize> MerkleLeaves for Confined<Vec<T>, MIN, { u32::MAX as usize }>
-where T: CommitId<CommitmentId = MerkleHash> + Copy
+where
+    T: CommitId<CommitmentId = MerkleHash> + Copy,
 {
     type Leaf = T;
     type LeafIter<'tmp>
         = iter::Copied<slice::Iter<'tmp, T>>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.iter().copied() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.iter().copied()
+    }
 }
 
 impl<T: Ord, const MIN: usize> MerkleLeaves for Confined<BTreeSet<T>, MIN, { u32::MAX as usize }>
-where T: CommitId<CommitmentId = MerkleHash> + Copy
+where
+    T: CommitId<CommitmentId = MerkleHash> + Copy,
 {
     type Leaf = T;
     type LeafIter<'tmp>
         = iter::Copied<btree_set::Iter<'tmp, T>>
-    where Self: 'tmp;
+    where
+        Self: 'tmp;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.iter().copied() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.iter().copied()
+    }
 }
 
 /// Helper struct to track depth when working with Merkle blocks.

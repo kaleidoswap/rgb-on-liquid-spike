@@ -70,20 +70,26 @@ pub struct BlindSeal<Id: SealTxid> {
 impl<Id: SealTxid> CommitEncode for BlindSeal<Id> {
     type CommitmentId = SecretSeal;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl<Id: SealTxid> BlindSeal<Id> {
     /// Converts revealed seal into concealed.
     #[inline]
-    pub fn to_secret_seal(&self) -> SecretSeal { self.conceal() }
+    pub fn to_secret_seal(&self) -> SecretSeal {
+        self.conceal()
+    }
 }
 
 impl<Id: SealTxid> Conceal for BlindSeal<Id> {
     type Concealed = SecretSeal;
 
     #[inline]
-    fn conceal(&self) -> Self::Concealed { self.commit_id() }
+    fn conceal(&self) -> Self::Concealed {
+        self.commit_id()
+    }
 }
 
 impl TryFrom<&BlindSeal<TxPtr>> for Outpoint {
@@ -109,26 +115,38 @@ impl TryFrom<BlindSeal<TxPtr>> for Outpoint {
 
 impl From<&BlindSeal<Txid>> for Outpoint {
     #[inline]
-    fn from(reveal: &BlindSeal<Txid>) -> Self { Outpoint::new(reveal.txid, reveal.vout.into_u32()) }
+    fn from(reveal: &BlindSeal<Txid>) -> Self {
+        Outpoint::new(reveal.txid, reveal.vout.into_u32())
+    }
 }
 
 impl From<BlindSeal<Txid>> for Outpoint {
     #[inline]
-    fn from(reveal: BlindSeal<Txid>) -> Self { Outpoint::from(&reveal) }
+    fn from(reveal: BlindSeal<Txid>) -> Self {
+        Outpoint::from(&reveal)
+    }
 }
 
 impl<Id: SealTxid> TxoSeal for BlindSeal<Id> {
     #[inline]
-    fn txid(&self) -> Option<Txid> { self.txid.txid() }
+    fn txid(&self) -> Option<Txid> {
+        self.txid.txid()
+    }
 
     #[inline]
-    fn vout(&self) -> Vout { self.vout }
+    fn vout(&self) -> Vout {
+        self.vout
+    }
 
     #[inline]
-    fn outpoint(&self) -> Option<Outpoint> { self.txid.map_to_outpoint(self.vout) }
+    fn outpoint(&self) -> Option<Outpoint> {
+        self.txid.map_to_outpoint(self.vout)
+    }
 
     #[inline]
-    fn txid_or(&self, default_txid: Txid) -> Txid { self.txid.txid_or(default_txid) }
+    fn txid_or(&self, default_txid: Txid) -> Txid {
+        self.txid.txid_or(default_txid)
+    }
 
     #[inline]
     fn outpoint_or(&self, default_txid: Txid) -> Outpoint {
@@ -201,7 +219,9 @@ impl BlindSeal<Txid> {
 
     /// Converts seal into a transaction outpoint.
     #[inline]
-    pub fn to_outpoint(&self) -> Outpoint { Outpoint::new(self.txid, self.vout.into_u32()) }
+    pub fn to_outpoint(&self) -> Outpoint {
+        Outpoint::new(self.txid, self.vout.into_u32())
+    }
 }
 
 impl BlindSeal<TxPtr> {
@@ -268,7 +288,8 @@ impl<Id: SealTxid> FromStr for BlindSeal<Id> {
 }
 
 impl<Id: SealTxid> Display for BlindSeal<Id>
-where Self: TxoSeal
+where
+    Self: TxoSeal,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "txoseal:{}:{}#{:#010x}", self.txid, self.vout, self.blinding)

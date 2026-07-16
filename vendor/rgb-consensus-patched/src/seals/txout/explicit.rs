@@ -76,25 +76,37 @@ impl TryFrom<ExplicitSeal<TxPtr>> for Outpoint {
 }
 
 impl From<&ExplicitSeal<Txid>> for Outpoint {
-    fn from(seal: &ExplicitSeal<Txid>) -> Self { Outpoint::new(seal.txid, seal.vout.into_u32()) }
+    fn from(seal: &ExplicitSeal<Txid>) -> Self {
+        Outpoint::new(seal.txid, seal.vout.into_u32())
+    }
 }
 
 impl From<ExplicitSeal<Txid>> for Outpoint {
-    fn from(seal: ExplicitSeal<Txid>) -> Self { Outpoint::from(&seal) }
+    fn from(seal: ExplicitSeal<Txid>) -> Self {
+        Outpoint::from(&seal)
+    }
 }
 
 impl<Id: SealTxid> TxoSeal for ExplicitSeal<Id> {
     #[inline]
-    fn txid(&self) -> Option<Txid> { self.txid.txid() }
+    fn txid(&self) -> Option<Txid> {
+        self.txid.txid()
+    }
 
     #[inline]
-    fn vout(&self) -> Vout { self.vout }
+    fn vout(&self) -> Vout {
+        self.vout
+    }
 
     #[inline]
-    fn outpoint(&self) -> Option<Outpoint> { self.txid.map_to_outpoint(self.vout) }
+    fn outpoint(&self) -> Option<Outpoint> {
+        self.txid.map_to_outpoint(self.vout)
+    }
 
     #[inline]
-    fn txid_or(&self, default_txid: Txid) -> Txid { self.txid.txid_or(default_txid) }
+    fn txid_or(&self, default_txid: Txid) -> Txid {
+        self.txid.txid_or(default_txid)
+    }
 
     #[inline]
     fn outpoint_or(&self, default_txid: Txid) -> Outpoint {
@@ -125,7 +137,9 @@ impl<Id: SealTxid> ExplicitSeal<Id> {
 impl ExplicitSeal<Txid> {
     /// Converts seal into a transaction outpoint.
     #[inline]
-    pub fn to_outpoint(&self) -> Outpoint { Outpoint::new(self.txid, self.vout.into_u32()) }
+    pub fn to_outpoint(&self) -> Outpoint {
+        Outpoint::new(self.txid, self.vout.into_u32())
+    }
 }
 
 /// Errors happening during parsing string representation of different forms of

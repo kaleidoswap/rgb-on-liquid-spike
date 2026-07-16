@@ -85,7 +85,7 @@ pub fn issue(
             amount,
         )
         .context("add fungible state")?
-        .issue_contract()
+        .issue_contract_raw(crate::bfa::GENESIS_TIMESTAMP)
         .map_err(|e| anyhow::anyhow!("issue_contract: {e:?}"))?;
 
     Ok(NiaIssuance {
@@ -113,7 +113,34 @@ pub fn build_transfer(
 ) -> Result<(BundleId, Transition)> {
     // Genesis OpId shares its 32 bytes with the ContractId.
     let genesis_opid = OpId::from(contract_id.to_byte_array());
+    build_transfer_from(
+        contract_id,
+        genesis_opid,
+        0,
+        initial_amount,
+        bob_amount,
+        bob_seal_outpoint,
+        change_seal_outpoint,
+        alice_input_vin,
+    )
+}
 
+/// [`build_transfer`] consuming an arbitrary prior allocation instead
+/// of the genesis one: `prev_opid`/`prev_opout_no` name the transition
+/// output being spent, `prev_amount` the allocation it carries. This is
+/// what makes transfers *chainable* — a swap-back leg consumes the
+/// allocation the swap-in claim created.
+#[allow(clippy::too_many_arguments)]
+pub fn build_transfer_from(
+    contract_id: ContractId,
+    prev_opid: OpId,
+    prev_opout_no: u16,
+    prev_amount: u64,
+    bob_amount: u64,
+    bob_seal_outpoint: OutPoint,
+    change_seal_outpoint: Option<OutPoint>,
+    alice_input_vin: u32,
+) -> Result<(BundleId, Transition)> {
     let schema = NonInflatableAsset::schema();
     let types = NonInflatableAsset::types();
 
@@ -125,12 +152,12 @@ pub fn build_transfer(
     )
     .map_err(|e| anyhow::anyhow!("TransitionBuilder::named_transition: {e:?}"))?;
 
-    // Input = Alice's genesis allocation: opout = (genesis_opid, OS_ASSET, 0)
-    let input_opout = Opout::new(genesis_opid, OS_ASSET, 0u16);
+    // Input = the consumed allocation: opout = (prev_opid, OS_ASSET, n)
+    let input_opout = Opout::new(prev_opid, OS_ASSET, prev_opout_no);
     builder = builder
         .add_input(
             input_opout,
-            AllocatedState::Amount(RevealedValue::new(Amount::from(initial_amount))),
+            AllocatedState::Amount(RevealedValue::new(Amount::from(prev_amount))),
         )
         .map_err(|e| anyhow::anyhow!("add_input: {e:?}"))?;
 
@@ -147,7 +174,7 @@ pub fn build_transfer(
 
     // Change back to Alice (if any).
     if let Some(change_op) = change_seal_outpoint {
-        let change_amount = initial_amount
+        let change_amount = prev_amount
             .checked_sub(bob_amount)
             .context("change amount underflow")?;
         if change_amount > 0 {
@@ -161,11 +188,11 @@ pub fn build_transfer(
                 )
                 .map_err(|e| anyhow::anyhow!("add_fungible_state (change): {e:?}"))?;
         }
-    } else if bob_amount != initial_amount {
+    } else if bob_amount != prev_amount {
         anyhow::bail!(
-            "no change seal provided but bob_amount ({}) != initial_amount ({})",
+            "no change seal provided but bob_amount ({}) != prev_amount ({})",
             bob_amount,
-            initial_amount
+            prev_amount
         );
     }
 

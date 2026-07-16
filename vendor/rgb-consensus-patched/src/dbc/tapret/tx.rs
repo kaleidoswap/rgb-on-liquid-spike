@@ -57,7 +57,9 @@ impl ConvolveCommitProof<mpc::Commitment, Tx, TapretFirst> for TapretProof {
         tx
     }
 
-    fn extract_supplement(&self) -> &Self::Suppl { self }
+    fn extract_supplement(&self) -> &Self::Suppl {
+        self
+    }
 }
 
 impl ConvolveCommit<mpc::Commitment, TapretProof, TapretFirst> for Tx {

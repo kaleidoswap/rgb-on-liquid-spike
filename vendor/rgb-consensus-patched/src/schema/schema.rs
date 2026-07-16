@@ -49,7 +49,9 @@ use crate::{impl_serde_baid64, Ffv, GlobalStateSchema, StateType, LIB_NAME_RGB_C
 )]
 pub struct MetaType(u16);
 impl MetaType {
-    pub const fn with(ty: u16) -> Self { Self(ty) }
+    pub const fn with(ty: u16) -> Self {
+        Self(ty)
+    }
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From, Display)]
@@ -64,7 +66,9 @@ impl MetaType {
 )]
 pub struct GlobalStateType(u16);
 impl GlobalStateType {
-    pub const fn with(ty: u16) -> Self { Self(ty) }
+    pub const fn with(ty: u16) -> Self {
+        Self(ty)
+    }
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From, Display)]
@@ -79,7 +83,9 @@ impl GlobalStateType {
 )]
 pub struct TransitionType(u16);
 impl TransitionType {
-    pub const fn with(ty: u16) -> Self { Self(ty) }
+    pub const fn with(ty: u16) -> Self {
+        Self(ty)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -149,11 +155,15 @@ pub struct SchemaId(
 );
 
 impl SchemaId {
-    pub const fn from_array(id: [u8; 32]) -> Self { SchemaId(Bytes32::from_array(id)) }
+    pub const fn from_array(id: [u8; 32]) -> Self {
+        SchemaId(Bytes32::from_array(id))
+    }
 }
 
 impl From<Sha256> for SchemaId {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+    fn from(hasher: Sha256) -> Self {
+        hasher.finish().into()
+    }
 }
 
 impl CommitmentId for SchemaId {
@@ -166,15 +176,21 @@ impl DisplayBaid64 for SchemaId {
     const PREFIX: bool = true;
     const EMBED_CHECKSUM: bool = false;
     const MNEMONIC: bool = true;
-    fn to_baid64_payload(&self) -> [u8; 32] { self.to_byte_array() }
+    fn to_baid64_payload(&self) -> [u8; 32] {
+        self.to_byte_array()
+    }
 }
 impl FromBaid64Str for SchemaId {}
 impl FromStr for SchemaId {
     type Err = Baid64ParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_baid64_str(s) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_baid64_str(s)
+    }
 }
 impl Display for SchemaId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { self.fmt_baid64(f) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_baid64(f)
+    }
 }
 
 impl_serde_baid64!(SchemaId);
@@ -220,15 +236,21 @@ impl CommitEncode for Schema {
 }
 
 impl PartialEq for Schema {
-    fn eq(&self, other: &Self) -> bool { self.schema_id() == other.schema_id() }
+    fn eq(&self, other: &Self) -> bool {
+        self.schema_id() == other.schema_id()
+    }
 }
 
 impl Ord for Schema {
-    fn cmp(&self, other: &Self) -> Ordering { self.schema_id().cmp(&other.schema_id()) }
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.schema_id().cmp(&other.schema_id())
+    }
 }
 
 impl PartialOrd for Schema {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl StrictSerialize for Schema {}
@@ -236,7 +258,9 @@ impl StrictDeserialize for Schema {}
 
 impl Schema {
     #[inline]
-    pub fn schema_id(&self) -> SchemaId { self.commit_id() }
+    pub fn schema_id(&self) -> SchemaId {
+        self.commit_id()
+    }
 
     pub fn types(&self) -> impl Iterator<Item = SemId> + '_ {
         self.meta_types
@@ -333,7 +357,9 @@ impl Schema {
             .expect("cannot find meta with the given name")
     }
 
-    pub fn meta_type(&self, name: impl Into<FieldName>) -> MetaType { *self.meta(name).0 }
+    pub fn meta_type(&self, name: impl Into<FieldName>) -> MetaType {
+        *self.meta(name).0
+    }
 
     pub fn meta_name(&self, type_id: MetaType) -> &FieldName {
         &self

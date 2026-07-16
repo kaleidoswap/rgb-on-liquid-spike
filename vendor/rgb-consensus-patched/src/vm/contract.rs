@@ -52,11 +52,15 @@ pub enum OrdOpRef<'op> {
 }
 
 impl PartialOrd for OrdOpRef<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for OrdOpRef<'_> {
-    fn cmp(&self, other: &Self) -> Ordering { self.op_ord().cmp(&other.op_ord()) }
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.op_ord().cmp(&other.op_ord())
+    }
 }
 
 impl OrdOpRef<'_> {
@@ -213,7 +217,9 @@ impl WitnessPos {
 }
 
 impl PartialOrd for WitnessPos {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for WitnessPos {
@@ -309,7 +315,9 @@ pub enum WitnessOrd {
 
 impl WitnessOrd {
     #[inline]
-    pub fn is_valid(self) -> bool { self != Self::Archived }
+    pub fn is_valid(self) -> bool {
+        self != Self::Archived
+    }
 }
 
 /// Operation ordering priority for contract state computation according to
@@ -346,10 +354,13 @@ pub enum OpOrd {
 impl OpOrd {
     #[inline]
     pub fn is_archived(&self) -> bool {
-        matches!(self, Self::Transition {
-            witness: WitnessOrd::Archived,
-            ..
-        })
+        matches!(
+            self,
+            Self::Transition {
+                witness: WitnessOrd::Archived,
+                ..
+            }
+        )
     }
 }
 
@@ -406,7 +417,9 @@ pub struct GlobalStateEntry {
 }
 
 impl GlobalStateEntry {
-    pub fn new(ord: GlobalOrd, data: RevealedData) -> Self { Self { ord, data } }
+    pub fn new(ord: GlobalOrd, data: RevealedData) -> Self {
+        Self { ord, data }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Display, Error)]
@@ -459,11 +472,17 @@ impl<'op> OpInfo<'op> {
         OpInfo { id, prev_state, op }
     }
 
-    pub fn global(&self) -> &'op GlobalState { self.op.globals() }
+    pub fn global(&self) -> &'op GlobalState {
+        self.op.globals()
+    }
 
-    pub fn metadata(&self) -> &'op Metadata { self.op.metadata() }
+    pub fn metadata(&self) -> &'op Metadata {
+        self.op.metadata()
+    }
 
-    pub fn owned_state(&self) -> AssignmentsRef<'op> { self.op.assignments() }
+    pub fn owned_state(&self) -> AssignmentsRef<'op> {
+        self.op.assignments()
+    }
 }
 
 #[cfg(test)]

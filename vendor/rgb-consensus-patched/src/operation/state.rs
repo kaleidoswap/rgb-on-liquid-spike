@@ -80,5 +80,7 @@ impl ExposedState for RevealedState {
             RevealedState::Structured(_) => StateType::Structured,
         }
     }
-    fn state_data(&self) -> RevealedState { self.clone() }
+    fn state_data(&self) -> RevealedState {
+        self.clone()
+    }
 }

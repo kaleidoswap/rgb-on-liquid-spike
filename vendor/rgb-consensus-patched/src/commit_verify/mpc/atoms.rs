@@ -104,11 +104,15 @@ pub enum Leaf {
 impl CommitEncode for Leaf {
     type CommitmentId = MerkleHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl Leaf {
-    pub fn entropy(entropy: u64, pos: u32) -> Self { Self::Entropy { entropy, pos } }
+    pub fn entropy(entropy: u64, pos: u32) -> Self {
+        Self::Entropy { entropy, pos }
+    }
 
     pub fn inhabited(protocol: ProtocolId, message: Message) -> Self {
         Self::Inhabited { protocol, message }
@@ -116,7 +120,9 @@ impl Leaf {
 }
 
 impl StrictDumb for Leaf {
-    fn strict_dumb() -> Self { Self::Entropy { entropy: 0, pos: 0 } }
+    fn strict_dumb() -> Self {
+        Self::Entropy { entropy: 0, pos: 0 }
+    }
 }
 
 /// Final [LNPBP-4] commitment value.
@@ -151,7 +157,9 @@ impl Commitment {
 }
 
 impl From<Sha256> for Commitment {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+    fn from(hasher: Sha256) -> Self {
+        hasher.finish().into()
+    }
 }
 
 /// Structured source multi-message data for commitment creation

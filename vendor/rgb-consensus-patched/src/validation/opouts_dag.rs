@@ -92,9 +92,13 @@ impl OpoutsDagInfo {
         }
     }
 
-    pub fn to_opouts_dag_data(&self) -> OpoutsDagData { (self.dag.clone(), self.index.clone()) }
+    pub fn to_opouts_dag_data(&self) -> OpoutsDagData {
+        (self.dag.clone(), self.index.clone())
+    }
 }
 
 impl Default for OpoutsDagInfo {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

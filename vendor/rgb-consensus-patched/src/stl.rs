@@ -50,9 +50,10 @@ pub const LIB_ID_RGB_LOGIC: &str =
     "stl:yqNY5jMt-mFYiR4O-wdbw6d9-vOPei8h-o3QQD3E-L5x1tPc#adam-hexagon-noise";
 
 pub fn commit_verify_stl() -> TypeLib {
-    LibBuilder::with(libname!(LIB_NAME_COMMIT_VERIFY), [
-        strict_types::stl::std_stl().to_dependency_types()
-    ])
+    LibBuilder::with(
+        libname!(LIB_NAME_COMMIT_VERIFY),
+        [strict_types::stl::std_stl().to_dependency_types()],
+    )
     .transpile::<MerkleHash>()
     .transpile::<MerkleNode>()
     .transpile::<StrictHash>()
@@ -69,10 +70,10 @@ pub fn commit_verify_stl() -> TypeLib {
 /// Generates strict type library providing data types from [`dbc`] and
 /// [`seals`] crates.
 pub fn bp_core_stl() -> TypeLib {
-    LibBuilder::with(libname!(LIB_NAME_BPCORE), [
-        bitcoin_stl().to_dependency_types(),
-        commit_verify_stl().to_dependency_types(),
-    ])
+    LibBuilder::with(
+        libname!(LIB_NAME_BPCORE),
+        [bitcoin_stl().to_dependency_types(), commit_verify_stl().to_dependency_types()],
+    )
     .transpile::<dbc::Anchor<dbc::opret::OpretProof>>()
     .transpile::<dbc::Anchor<dbc::tapret::TapretProof>>()
     .transpile::<seals::SecretSeal>()
@@ -86,14 +87,17 @@ pub fn bp_core_stl() -> TypeLib {
 
 /// Generates strict type library providing data types for RGB consensus.
 pub fn rgb_commit_stl() -> TypeLib {
-    LibBuilder::with(libname!(LIB_NAME_RGB_COMMIT), [
-        std_stl().to_dependency_types(),
-        strict_types_stl().to_dependency_types(),
-        commit_verify_stl().to_dependency_types(),
-        bitcoin_stl().to_dependency_types(),
-        bp_core_stl().to_dependency_types(),
-        aluvm_stl().to_dependency_types(),
-    ])
+    LibBuilder::with(
+        libname!(LIB_NAME_RGB_COMMIT),
+        [
+            std_stl().to_dependency_types(),
+            strict_types_stl().to_dependency_types(),
+            commit_verify_stl().to_dependency_types(),
+            bitcoin_stl().to_dependency_types(),
+            bp_core_stl().to_dependency_types(),
+            aluvm_stl().to_dependency_types(),
+        ],
+    )
     .transpile::<BundleId>()
     .transpile::<Genesis>()
     .transpile::<OpCommitment>()
@@ -114,11 +118,14 @@ pub fn rgb_contract_id_stl() -> TypeLib {
 
 /// Generates strict type library providing data types for RGB consensus.
 pub fn rgb_logic_stl() -> TypeLib {
-    LibBuilder::with(libname!(LIB_NAME_RGB_LOGIC), [
-        bitcoin_stl().to_dependency_types(),
-        bp_core_stl().to_dependency_types(),
-        rgb_commit_stl().to_dependency_types(),
-    ])
+    LibBuilder::with(
+        libname!(LIB_NAME_RGB_LOGIC),
+        [
+            bitcoin_stl().to_dependency_types(),
+            bp_core_stl().to_dependency_types(),
+            rgb_commit_stl().to_dependency_types(),
+        ],
+    )
     .transpile::<DbcProof>()
     .transpile::<GlobalOrd>()
     .compile()

@@ -45,7 +45,9 @@ pub enum RgbIsa<S: ContractStateAccess> {
 impl<S: ContractStateAccess> InstructionSet for RgbIsa<S> {
     type Context<'ctx> = VmContext<'ctx, S>;
 
-    fn isa_ids() -> IsaSeg { IsaSeg::with("RGB") }
+    fn isa_ids() -> IsaSeg {
+        IsaSeg::with("RGB")
+    }
 
     fn src_regs(&self) -> BTreeSet<Reg> {
         match self {
@@ -77,7 +79,9 @@ impl<S: ContractStateAccess> InstructionSet for RgbIsa<S> {
 }
 
 impl<S: ContractStateAccess> Bytecode for RgbIsa<S> {
-    fn instr_range() -> RangeInclusive<u8> { INSTR_RGBISA_FROM..=INSTR_RGBISA_TO }
+    fn instr_range() -> RangeInclusive<u8> {
+        INSTR_RGBISA_FROM..=INSTR_RGBISA_TO
+    }
 
     fn instr_byte(&self) -> u8 {
         match self {
@@ -87,7 +91,9 @@ impl<S: ContractStateAccess> Bytecode for RgbIsa<S> {
     }
 
     fn encode_args<W>(&self, writer: &mut W) -> Result<(), BytecodeError>
-    where W: Write {
+    where
+        W: Write,
+    {
         match self {
             RgbIsa::Contract(op) => op.encode_args(writer),
             RgbIsa::Fail(_) => Ok(()),

@@ -93,7 +93,11 @@ impl dbc::Proof for DbcProof {
         }
     }
 
-    fn verify<W: crate::dbc::WitnessTx>(&self, msg: &Commitment, tx: &W) -> Result<(), Self::Error> {
+    fn verify<W: crate::dbc::WitnessTx>(
+        &self,
+        msg: &Commitment,
+        tx: &W,
+    ) -> Result<(), Self::Error> {
         match self {
             DbcProof::Tapret(tapret) => tapret.verify(msg, tx).map_err(|err| match err {
                 ConvolveVerifyError::CommitmentMismatch => DbcError::CommitmentMismatch,

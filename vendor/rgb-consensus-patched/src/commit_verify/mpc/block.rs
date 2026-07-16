@@ -116,9 +116,13 @@ impl TreeNode {
         }
     }
 
-    pub fn depth_or(&self, tree_depth: u5) -> u5 { self.depth().unwrap_or(tree_depth) }
+    pub fn depth_or(&self, tree_depth: u5) -> u5 {
+        self.depth().unwrap_or(tree_depth)
+    }
 
-    pub fn is_leaf(&self) -> bool { matches!(self, TreeNode::CommitmentLeaf { .. }) }
+    pub fn is_leaf(&self) -> bool {
+        matches!(self, TreeNode::CommitmentLeaf { .. })
+    }
 
     pub fn to_merkle_node(self) -> MerkleHash {
         match self {
@@ -154,13 +158,17 @@ pub struct MerkleConcealed {
 impl CommitEncode for MerkleConcealed {
     type CommitmentId = Commitment;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl Conceal for MerkleConcealed {
     type Concealed = Self;
 
-    fn conceal(&self) -> Self::Concealed { *self }
+    fn conceal(&self) -> Self::Concealed {
+        *self
+    }
 }
 
 /// Partially-concealed merkle tree data.
@@ -191,7 +199,9 @@ pub struct MerkleBlock {
 impl CommitEncode for MerkleBlock {
     type CommitmentId = Commitment;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_concealed(&self.conceal()); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_concealed(&self.conceal());
+    }
 }
 
 impl StrictDumb for MerkleBlock {
@@ -209,7 +219,9 @@ impl StrictSerialize for MerkleBlock {}
 impl StrictDeserialize for MerkleBlock {}
 
 impl Proof for MerkleBlock {
-    fn matches(&self, other: &Self) -> bool { self.commit_id() == other.commit_id() }
+    fn matches(&self, other: &Self) -> bool {
+        self.commit_id() == other.commit_id()
+    }
 }
 
 impl From<&MerkleTree> for MerkleBlock {
@@ -240,7 +252,9 @@ impl From<&MerkleTree> for MerkleBlock {
 }
 
 impl From<MerkleTree> for MerkleBlock {
-    fn from(tree: MerkleTree) -> Self { MerkleBlock::from(&tree) }
+    fn from(tree: MerkleTree) -> Self {
+        MerkleBlock::from(&tree)
+    }
 }
 
 impl MerkleBlock {
@@ -605,11 +619,15 @@ Changed commitment id: {}",
     }
 
     /// Computes the maximum possible width of the merkle tree.
-    pub fn width_limit(&self) -> u32 { 2u32.pow(self.depth.to_u8() as u32) }
+    pub fn width_limit(&self) -> u32 {
+        2u32.pow(self.depth.to_u8() as u32)
+    }
 
     /// Computes the factored width of the merkle tree according to the formula
     /// `2 ^ depth - cofactor`.
-    pub fn factored_width(&self) -> u32 { self.width_limit() - self.cofactor as u32 }
+    pub fn factored_width(&self) -> u32 {
+        self.width_limit() - self.cofactor as u32
+    }
 
     /// Constructs [`MessageMap`] for revealed protocols and messages.
     pub fn to_known_message_map(&self) -> MessageMap {
@@ -685,28 +703,42 @@ impl Proof for MerkleProof {
 
 impl MerkleProof {
     /// Computes the depth of the merkle tree.
-    pub fn depth(&self) -> u5 { u5::with(self.path.len() as u8) }
+    pub fn depth(&self) -> u5 {
+        u5::with(self.path.len() as u8)
+    }
 
     /// Computes the maximum width of the merkle tree.
-    pub fn width_limit(&self) -> u32 { 2u32.pow(self.depth().to_u8() as u32) }
+    pub fn width_limit(&self) -> u32 {
+        2u32.pow(self.depth().to_u8() as u32)
+    }
 
     /// Computes the factored width of the merkle tree according to the formula
     /// `2 ^ depth - cofactor`.
-    pub fn factored_width(&self) -> u32 { self.width_limit() - self.cofactor as u32 }
+    pub fn factored_width(&self) -> u32 {
+        self.width_limit() - self.cofactor as u32
+    }
 
     /// Converts the proof into inner merkle path representation
-    pub fn into_path(self) -> Confined<Vec<MerkleHash>, 0, 32> { self.path }
+    pub fn into_path(self) -> Confined<Vec<MerkleHash>, 0, 32> {
+        self.path
+    }
 
     /// Constructs the proof into inner merkle path representation
-    pub fn to_path(&self) -> Confined<Vec<MerkleHash>, 0, 32> { self.path.clone() }
+    pub fn to_path(&self) -> Confined<Vec<MerkleHash>, 0, 32> {
+        self.path.clone()
+    }
 
     /// Returns inner merkle path representation
-    pub fn as_path(&self) -> &[MerkleHash] { &self.path }
+    pub fn as_path(&self) -> &[MerkleHash] {
+        &self.path
+    }
 
     /// Returns the root of the merkle path.
     ///
     /// If the MPC proof contains only a single message returns None
-    pub fn merkle_root(&self) -> Option<MerkleHash> { self.path.first().copied() }
+    pub fn merkle_root(&self) -> Option<MerkleHash> {
+        self.path.first().copied()
+    }
 
     /// Convolves the proof with the `message` under the given `protocol_id`,
     /// producing [`Commitment`].

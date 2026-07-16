@@ -131,12 +131,16 @@ impl TapretRightBranch {
     /// Returns hash of the left-side child node of the branch (having smaller
     /// hash value).
     #[inline]
-    pub fn left_node_hash(&self) -> TapNodeHash { self.left_node_hash }
+    pub fn left_node_hash(&self) -> TapNodeHash {
+        self.left_node_hash
+    }
 
     /// Returns hash of the right-side child node of the branch (having smaller
     /// hash value).
     #[inline]
-    pub fn right_node_hash(&self) -> TapNodeHash { self.right_node_hash }
+    pub fn right_node_hash(&self) -> TapNodeHash {
+        self.right_node_hash
+    }
 
     /// Computes node hash of the partner node defined by this proof.
     pub fn node_hash(&self) -> TapNodeHash {
@@ -295,7 +299,9 @@ mod leaf_script_serde {
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<LeafScript<ScriptBuf>, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let data = LeafScriptData::deserialize(deserializer)?;
 
         let byte = match data.version {
@@ -445,7 +451,9 @@ impl TapretProof {
 impl Proof<Method> for TapretProof {
     type Error = ConvolveVerifyError;
 
-    fn method(&self) -> Method { Method::TapretFirst }
+    fn method(&self) -> Method {
+        Method::TapretFirst
+    }
 
     /// Verifies that `tx` contains a P2TR output whose script_pubkey is
     /// the TapretFirst commitment to `msg` under this proof's internal

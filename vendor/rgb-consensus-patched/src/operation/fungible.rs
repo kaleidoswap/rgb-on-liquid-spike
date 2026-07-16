@@ -61,12 +61,16 @@ pub enum FungibleState {
 impl DefaultBasedStrictDumb for FungibleState {}
 
 impl Default for FungibleState {
-    fn default() -> Self { FungibleState::Bits64(0) }
+    fn default() -> Self {
+        FungibleState::Bits64(0)
+    }
 }
 
 impl FromStr for FungibleState {
     type Err = ParseIntError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> { s.parse().map(FungibleState::Bits64) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(FungibleState::Bits64)
+    }
 }
 
 impl From<FungibleState> for u64 {
@@ -84,7 +88,9 @@ impl FungibleState {
         }
     }
 
-    pub fn as_u64(&self) -> u64 { (*self).into() }
+    pub fn as_u64(&self) -> u64 {
+        (*self).into()
+    }
 }
 
 /// State item for a homomorphically-encryptable state.
@@ -100,14 +106,22 @@ pub struct RevealedValue(FungibleState);
 
 impl RevealedValue {
     /// Convenience constructor.
-    pub fn new(value: impl Into<FungibleState>) -> Self { Self(value.into()) }
+    pub fn new(value: impl Into<FungibleState>) -> Self {
+        Self(value.into())
+    }
 }
 
 impl ExposedState for RevealedValue {
-    fn state_type(&self) -> StateType { StateType::Fungible }
-    fn state_data(&self) -> RevealedState { RevealedState::Fungible(*self) }
+    fn state_type(&self) -> StateType {
+        StateType::Fungible
+    }
+    fn state_data(&self) -> RevealedState {
+        RevealedState::Fungible(*self)
+    }
 }
 
 impl From<u64> for RevealedValue {
-    fn from(value: u64) -> Self { Self(FungibleState::Bits64(value)) }
+    fn from(value: u64) -> Self {
+        Self(FungibleState::Bits64(value))
+    }
 }

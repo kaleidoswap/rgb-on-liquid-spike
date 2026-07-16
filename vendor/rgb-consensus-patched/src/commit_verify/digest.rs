@@ -52,9 +52,13 @@ impl DigestExt for Sha256 {
         engine
     }
 
-    fn input_raw(&mut self, data: &[u8]) { self.update(data); }
+    fn input_raw(&mut self, data: &[u8]) {
+        self.update(data);
+    }
 
-    fn finish(self) -> [u8; 32] { self.finalize().into() }
+    fn finish(self) -> [u8; 32] {
+        self.finalize().into()
+    }
 }
 
 impl DigestExt<20> for Ripemd160 {
@@ -69,7 +73,11 @@ impl DigestExt<20> for Ripemd160 {
         engine
     }
 
-    fn input_raw(&mut self, data: &[u8]) { self.update(data); }
+    fn input_raw(&mut self, data: &[u8]) {
+        self.update(data);
+    }
 
-    fn finish(self) -> [u8; 20] { self.finalize().into() }
+    fn finish(self) -> [u8; 20] {
+        self.finalize().into()
+    }
 }

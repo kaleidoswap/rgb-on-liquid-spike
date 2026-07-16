@@ -77,8 +77,12 @@ pub trait SealTxid:
 }
 
 impl SealTxid for Txid {
-    fn txid(&self) -> Option<Txid> { Some(*self) }
-    fn txid_or(&self, _default: Txid) -> Txid { *self }
+    fn txid(&self) -> Option<Txid> {
+        Some(*self)
+    }
+    fn txid_or(&self, _default: Txid) -> Txid {
+        *self
+    }
     fn map_to_outpoint(&self, vout: impl Into<Vout>) -> Option<Outpoint> {
         Some(Outpoint::new(*self, vout.into().into_u32()))
     }
@@ -109,12 +113,16 @@ pub enum TxPtr {
 
 impl From<&Txid> for TxPtr {
     #[inline]
-    fn from(txid: &Txid) -> Self { TxPtr::Txid(*txid) }
+    fn from(txid: &Txid) -> Self {
+        TxPtr::Txid(*txid)
+    }
 }
 
 impl From<[u8; 32]> for TxPtr {
     #[inline]
-    fn from(txid: [u8; 32]) -> Self { TxPtr::Txid(Txid::from_byte_array(txid)) }
+    fn from(txid: [u8; 32]) -> Self {
+        TxPtr::Txid(Txid::from_byte_array(txid))
+    }
 }
 
 impl SealTxid for TxPtr {

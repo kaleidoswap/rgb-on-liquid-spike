@@ -135,7 +135,9 @@ struct CheckedWitnessResolver<R: ResolveWitness> {
 }
 
 impl<R: ResolveWitness> From<R> for CheckedWitnessResolver<R> {
-    fn from(inner: R) -> Self { Self { inner } }
+    fn from(inner: R) -> Self {
+        Self { inner }
+    }
 }
 
 impl<R: ResolveWitness> ResolveWitness for CheckedWitnessResolver<R> {

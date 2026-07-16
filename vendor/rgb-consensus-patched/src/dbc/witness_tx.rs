@@ -40,7 +40,9 @@ pub trait WitnessTx {
 }
 
 impl WitnessTx for Transaction {
-    fn witness_txid(&self) -> [u8; 32] { self.compute_txid().to_byte_array() }
+    fn witness_txid(&self) -> [u8; 32] {
+        self.compute_txid().to_byte_array()
+    }
 
     fn input_outpoints(&self) -> Vec<([u8; 32], u32)> {
         self.input

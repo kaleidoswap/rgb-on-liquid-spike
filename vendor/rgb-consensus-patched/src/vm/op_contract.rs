@@ -189,7 +189,9 @@ pub enum ContractOp<S: ContractStateAccess> {
 impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
     type Context<'ctx> = VmContext<'ctx, S>;
 
-    fn isa_ids() -> IsaSeg { IsaSeg::with("RGB") }
+    fn isa_ids() -> IsaSeg {
+        IsaSeg::with("RGB")
+    }
 
     fn src_regs(&self) -> BTreeSet<Reg> {
         match self {
@@ -520,7 +522,9 @@ impl<S: ContractStateAccess> InstructionSet for ContractOp<S> {
 }
 
 impl<S: ContractStateAccess> Bytecode for ContractOp<S> {
-    fn instr_range() -> RangeInclusive<u8> { INSTR_CONTRACT_FROM..=INSTR_CONTRACT_TO }
+    fn instr_range() -> RangeInclusive<u8> {
+        INSTR_CONTRACT_FROM..=INSTR_CONTRACT_TO
+    }
 
     fn instr_byte(&self) -> u8 {
         match self {
@@ -547,7 +551,9 @@ impl<S: ContractStateAccess> Bytecode for ContractOp<S> {
     }
 
     fn encode_args<W>(&self, writer: &mut W) -> Result<(), BytecodeError>
-    where W: Write {
+    where
+        W: Write,
+    {
         match self {
             ContractOp::CnP(state_type, reg) => {
                 writer.write_u16(*state_type)?;

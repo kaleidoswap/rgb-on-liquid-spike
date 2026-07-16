@@ -59,10 +59,14 @@ impl StrictSerialize for ContractId {}
 impl StrictDeserialize for ContractId {}
 
 impl PartialEq<OpId> for ContractId {
-    fn eq(&self, other: &OpId) -> bool { self.to_byte_array() == other.to_byte_array() }
+    fn eq(&self, other: &OpId) -> bool {
+        self.to_byte_array() == other.to_byte_array()
+    }
 }
 impl PartialEq<ContractId> for OpId {
-    fn eq(&self, other: &ContractId) -> bool { self.to_byte_array() == other.to_byte_array() }
+    fn eq(&self, other: &ContractId) -> bool {
+        self.to_byte_array() == other.to_byte_array()
+    }
 }
 
 impl ContractId {
@@ -81,23 +85,33 @@ impl DisplayBaid64 for ContractId {
     const PREFIX: bool = true;
     const EMBED_CHECKSUM: bool = false;
     const MNEMONIC: bool = false;
-    fn to_baid64_payload(&self) -> [u8; 32] { self.to_byte_array() }
+    fn to_baid64_payload(&self) -> [u8; 32] {
+        self.to_byte_array()
+    }
 }
 impl FromBaid64Str for ContractId {}
 impl FromStr for ContractId {
     type Err = Baid64ParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_baid64_str(s) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_baid64_str(s)
+    }
 }
 impl Display for ContractId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { self.fmt_baid64(f) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_baid64(f)
+    }
 }
 
 impl From<mpc::ProtocolId> for ContractId {
-    fn from(id: mpc::ProtocolId) -> Self { ContractId(id.into_inner()) }
+    fn from(id: mpc::ProtocolId) -> Self {
+        ContractId(id.into_inner())
+    }
 }
 
 impl From<ContractId> for mpc::ProtocolId {
-    fn from(id: ContractId) -> Self { mpc::ProtocolId::from_inner(id.into_inner()) }
+    fn from(id: ContractId) -> Self {
+        mpc::ProtocolId::from_inner(id.into_inner())
+    }
 }
 
 impl_serde_baid64!(ContractId);
@@ -121,7 +135,9 @@ pub struct OpId(
 );
 
 impl From<Sha256> for OpId {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+    fn from(hasher: Sha256) -> Self {
+        hasher.finish().into()
+    }
 }
 
 impl CommitmentId for OpId {
@@ -130,7 +146,9 @@ impl CommitmentId for OpId {
 
 impl FromStr for OpId {
     type Err = hex::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_hex(s) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_hex(s)
+    }
 }
 
 impl OpId {
@@ -158,7 +176,9 @@ pub struct DiscloseHash(
 );
 
 impl From<Sha256> for DiscloseHash {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+    fn from(hasher: Sha256) -> Self {
+        hasher.finish().into()
+    }
 }
 
 impl CommitmentId for DiscloseHash {
@@ -167,7 +187,9 @@ impl CommitmentId for DiscloseHash {
 
 impl FromStr for DiscloseHash {
     type Err = hex::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_hex(s) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_hex(s)
+    }
 }
 
 impl DiscloseHash {
@@ -185,7 +207,9 @@ pub struct AssignmentIndex {
 }
 
 impl AssignmentIndex {
-    pub fn new(ty: AssignmentType, pos: u16) -> Self { AssignmentIndex { ty, pos } }
+    pub fn new(ty: AssignmentType, pos: u16) -> Self {
+        AssignmentIndex { ty, pos }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -201,7 +225,9 @@ pub struct OpDisclose {
 impl CommitEncode for OpDisclose {
     type CommitmentId = DiscloseHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -215,7 +241,9 @@ pub struct BundleDisclosure {
 impl CommitEncode for BundleDisclosure {
     type CommitmentId = DiscloseHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl StrictDumb for BundleDisclosure {
@@ -241,7 +269,9 @@ impl TransitionBundle {
     }
 
     /// Returns commitment to the bundle plus revealed data within it.
-    pub fn disclose_hash(&self) -> DiscloseHash { self.disclose().commit_id() }
+    pub fn disclose_hash(&self) -> DiscloseHash {
+        self.disclose().commit_id()
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -282,7 +312,9 @@ pub struct OpCommitment {
 impl CommitEncode for OpCommitment {
     type CommitmentId = OpId;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl Genesis {
@@ -305,7 +337,9 @@ impl Genesis {
         }
     }
 
-    pub fn disclose_hash(&self) -> DiscloseHash { self.disclose().commit_id() }
+    pub fn disclose_hash(&self) -> DiscloseHash {
+        self.disclose().commit_id()
+    }
 }
 
 impl Transition {
@@ -367,7 +401,8 @@ impl<Seal: ExposedSeal> MerkleLeaves for Assignments<Seal> {
     type Leaf = AssignmentCommitment;
     type LeafIter<'tmp>
         = vec::IntoIter<AssignmentCommitment>
-    where Seal: 'tmp;
+    where
+        Seal: 'tmp;
 
     fn merkle_leaves(&self) -> Self::LeafIter<'_> {
         self.iter()

@@ -113,7 +113,9 @@ macro_rules! impl_serde_baid64 {
 
             impl Serialize for $ty {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: Serializer {
+                where
+                    S: Serializer,
+                {
                     if serializer.is_human_readable() {
                         self.to_string().serialize(serializer)
                     } else {
@@ -124,7 +126,9 @@ macro_rules! impl_serde_baid64 {
 
             impl<'de> Deserialize<'de> for $ty {
                 fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: Deserializer<'de> {
+                where
+                    D: Deserializer<'de>,
+                {
                     if deserializer.is_human_readable() {
                         let s = String::deserialize(deserializer)?;
                         Self::from_str(&s).map_err(D::Error::custom)

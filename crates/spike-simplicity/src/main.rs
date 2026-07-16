@@ -981,8 +981,16 @@ mod tests {
     }
 
     fn compile_with_hash(hash: &str) -> CompiledProgram {
+        // Unique file per call: parallel tests share hash values, and a
+        // shared path races (one test's truncating write against
+        // another's read → "EOF while parsing").
+        static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let args = format!(r#"{{ "EXPECTED_HASH": {{ "value": "0x{hash}", "type": "u256" }} }}"#);
-        let dir = std::env::temp_dir().join(format!("simp-test-args-{hash}.json"));
+        let dir = std::env::temp_dir().join(format!(
+            "simp-test-args-{}-{seq}-{hash}.json",
+            std::process::id()
+        ));
         std::fs::write(&dir, args).unwrap();
         compile(&program_path(), dir.to_str().unwrap()).expect("covenant program compiles")
     }

@@ -71,11 +71,7 @@ where
     ///
     /// Errors if the commitment doesn't pass the validation (see
     /// [`ConvolveVerifyError`] variants for the cases when this may happen).
-    fn verify(
-        &self,
-        msg: &Msg,
-        commitment: &Source::Commitment,
-    ) -> Result<(), ConvolveVerifyError>
+    fn verify(&self, msg: &Msg, commitment: &Source::Commitment) -> Result<(), ConvolveVerifyError>
     where
         Self: VerifyEq,
     {

@@ -48,22 +48,34 @@ use crate::{OpId, Transition, LIB_NAME_RGB_COMMIT};
 pub struct Vout(u32);
 
 impl Vout {
-    pub const fn from_u32(u: u32) -> Self { Vout(u) }
+    pub const fn from_u32(u: u32) -> Self {
+        Vout(u)
+    }
     #[inline]
-    pub const fn into_u32(self) -> u32 { self.0 }
+    pub const fn into_u32(self) -> u32 {
+        self.0
+    }
     #[inline]
-    pub const fn into_usize(self) -> usize { self.0 as usize }
+    pub const fn into_usize(self) -> usize {
+        self.0 as usize
+    }
     #[inline]
-    pub const fn to_u32(&self) -> u32 { self.0 }
+    pub const fn to_u32(&self) -> u32 {
+        self.0
+    }
     #[inline]
-    pub const fn to_usize(&self) -> usize { self.0 as usize }
+    pub const fn to_usize(&self) -> usize {
+        self.0 as usize
+    }
 }
 
 impl FromStr for Vout {
     type Err = ParseIntError;
 
     #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> { s.parse().map(Self) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
 }
 
 pub type Vin = Vout;
@@ -86,7 +98,9 @@ pub struct BundleId(
 );
 
 impl From<Sha256> for BundleId {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+    fn from(hasher: Sha256) -> Self {
+        hasher.finish().into()
+    }
 }
 
 impl CommitmentId for BundleId {
@@ -94,11 +108,15 @@ impl CommitmentId for BundleId {
 }
 
 impl From<BundleId> for mpc::Message {
-    fn from(id: BundleId) -> Self { mpc::Message::from_inner(id.into_inner()) }
+    fn from(id: BundleId) -> Self {
+        mpc::Message::from_inner(id.into_inner())
+    }
 }
 
 impl From<mpc::Message> for BundleId {
-    fn from(id: mpc::Message) -> Self { BundleId(id.into_inner()) }
+    fn from(id: mpc::Message) -> Self {
+        BundleId(id.into_inner())
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
@@ -123,7 +141,9 @@ pub struct KnownTransition {
 }
 
 impl KnownTransition {
-    pub fn new(opid: OpId, transition: Transition) -> Self { Self { opid, transition } }
+    pub fn new(opid: OpId, transition: Transition) -> Self {
+        Self { opid, transition }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, From)]
@@ -142,7 +162,9 @@ pub struct TransitionBundle {
 impl CommitEncode for TransitionBundle {
     type CommitmentId = BundleId;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_map(&self.input_map); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_map(&self.input_map);
+    }
 }
 
 impl StrictDumb for TransitionBundle {
@@ -155,9 +177,13 @@ impl StrictDumb for TransitionBundle {
 }
 
 impl TransitionBundle {
-    pub fn bundle_id(&self) -> BundleId { self.commit_id() }
+    pub fn bundle_id(&self) -> BundleId {
+        self.commit_id()
+    }
 
-    pub fn input_map_opids(&self) -> BTreeSet<OpId> { self.input_map.values().copied().collect() }
+    pub fn input_map_opids(&self) -> BTreeSet<OpId> {
+        self.input_map.values().copied().collect()
+    }
 
     pub fn known_transitions_opids(&self) -> BTreeSet<OpId> {
         self.known_transitions

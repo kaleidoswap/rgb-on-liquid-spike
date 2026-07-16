@@ -47,9 +47,13 @@ pub enum TapretKeyError {
 impl ConvolveCommitProof<mpc::Commitment, UntweakedPublicKey, TapretFirst> for TapretProof {
     type Suppl = TapretPathProof;
 
-    fn restore_original(&self, _: &TweakedPublicKey) -> UntweakedPublicKey { self.internal_pk }
+    fn restore_original(&self, _: &TweakedPublicKey) -> UntweakedPublicKey {
+        self.internal_pk
+    }
 
-    fn extract_supplement(&self) -> &Self::Suppl { &self.path_proof }
+    fn extract_supplement(&self) -> &Self::Suppl {
+        &self.path_proof
+    }
 }
 
 impl ConvolveCommit<mpc::Commitment, TapretProof, TapretFirst> for UntweakedPublicKey {
@@ -121,10 +125,13 @@ mod test {
 
         assert_eq!(outer_key, real_key);
 
-        assert_eq!(proof, TapretProof {
-            path_proof,
-            internal_pk
-        });
+        assert_eq!(
+            proof,
+            TapretProof {
+                path_proof,
+                internal_pk
+            }
+        );
 
         ConvolveCommitProof::<Commitment, UntweakedPublicKey, TapretFirst>::verify(
             &proof, &msg, &outer_key,
@@ -150,10 +157,13 @@ mod test {
 
         let (outer_key, proof) = internal_pk.convolve_commit(&path_proof, &msg).unwrap();
 
-        assert_eq!(proof, TapretProof {
-            path_proof,
-            internal_pk
-        });
+        assert_eq!(
+            proof,
+            TapretProof {
+                path_proof,
+                internal_pk
+            }
+        );
 
         ConvolveCommitProof::<Commitment, UntweakedPublicKey, TapretFirst>::verify(
             &proof, &msg, &outer_key,
@@ -180,10 +190,13 @@ mod test {
 
         let (outer_key, proof) = internal_pk.convolve_commit(&path_proof, &msg).unwrap();
 
-        assert_eq!(proof, TapretProof {
-            path_proof,
-            internal_pk
-        });
+        assert_eq!(
+            proof,
+            TapretProof {
+                path_proof,
+                internal_pk
+            }
+        );
 
         ConvolveCommitProof::<Commitment, UntweakedPublicKey, TapretFirst>::verify(
             &proof, &msg, &outer_key,

@@ -61,11 +61,15 @@ pub struct MerkleTree {
 impl CommitEncode for MerkleTree {
     type CommitmentId = Commitment;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_concealed(&self.conceal()); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_concealed(&self.conceal());
+    }
 }
 
 impl Proof for MerkleTree {
-    fn matches(&self, other: &Self) -> bool { self.commit_id() == other.commit_id() }
+    fn matches(&self, other: &Self) -> bool {
+        self.commit_id() == other.commit_id()
+    }
 }
 
 impl MerkleTree {
@@ -85,7 +89,9 @@ impl MerkleTree {
 impl Conceal for MerkleTree {
     type Concealed = MerkleConcealed;
 
-    fn conceal(&self) -> Self::Concealed { MerkleBlock::from(self.clone()).conceal() }
+    fn conceal(&self) -> Self::Concealed {
+        MerkleBlock::from(self.clone()).conceal()
+    }
 }
 
 mod commit {
@@ -192,17 +198,27 @@ impl MerkleTree {
 
     /// Computes the maximum possible width of the merkle tree, equal to `2 ^
     /// depth`.
-    pub fn width_limit(&self) -> u32 { 2u32.pow(self.depth.to_u8() as u32) }
+    pub fn width_limit(&self) -> u32 {
+        2u32.pow(self.depth.to_u8() as u32)
+    }
 
     /// Computes the factored width of the merkle tree, equal to `2 ^ depth -
     /// cofactor`.
-    pub fn factored_width(&self) -> u32 { self.width_limit() - self.cofactor as u32 }
+    pub fn factored_width(&self) -> u32 {
+        self.width_limit() - self.cofactor as u32
+    }
 
-    pub fn depth(&self) -> u5 { self.depth }
+    pub fn depth(&self) -> u5 {
+        self.depth
+    }
 
-    pub fn cofactor(&self) -> u16 { self.cofactor }
+    pub fn cofactor(&self) -> u16 {
+        self.cofactor
+    }
 
-    pub fn entropy(&self) -> u64 { self.entropy }
+    pub fn entropy(&self) -> u64 {
+        self.entropy
+    }
 }
 
 #[cfg(test)]

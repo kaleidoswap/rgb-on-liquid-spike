@@ -75,7 +75,9 @@ impl StrictDeserialize for OpretProof {}
 impl Proof<Method> for OpretProof {
     type Error = EmbedVerifyError<OpretError>;
 
-    fn method(&self) -> Method { Method::OpretFirst }
+    fn method(&self) -> Method {
+        Method::OpretFirst
+    }
 
     /// Verifies that `tx` contains an OP_RETURN output committing to
     /// `msg` under this proof.
@@ -95,7 +97,9 @@ impl Proof<Method> for OpretProof {
             if !spk.is_op_return() {
                 continue;
             }
-            return <ScriptBuf as EmbedCommitVerify<Commitment, OpretFirst>>::verify(&spk, msg, self);
+            return <ScriptBuf as EmbedCommitVerify<Commitment, OpretFirst>>::verify(
+                &spk, msg, self,
+            );
         }
         Err(EmbedVerifyError::InvalidMessage(OpretError::NoOpretOutput))
     }

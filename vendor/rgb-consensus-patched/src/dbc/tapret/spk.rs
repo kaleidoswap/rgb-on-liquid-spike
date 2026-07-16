@@ -27,9 +27,13 @@ use crate::commit_verify::{mpc, ConvolveCommit, ConvolveCommitProof};
 impl ConvolveCommitProof<mpc::Commitment, ScriptBuf, TapretFirst> for TapretProof {
     type Suppl = Self;
 
-    fn restore_original(&self, _: &ScriptBuf) -> ScriptBuf { self.original_pubkey_script() }
+    fn restore_original(&self, _: &ScriptBuf) -> ScriptBuf {
+        self.original_pubkey_script()
+    }
 
-    fn extract_supplement(&self) -> &Self::Suppl { self }
+    fn extract_supplement(&self) -> &Self::Suppl {
+        self
+    }
 }
 
 impl ConvolveCommit<mpc::Commitment, TapretProof, TapretFirst> for ScriptBuf {

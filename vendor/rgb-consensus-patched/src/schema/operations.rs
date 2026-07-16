@@ -41,12 +41,18 @@ use crate::LIB_NAME_RGB_COMMIT;
 )]
 pub struct AssignmentType(u16);
 impl AssignmentType {
-    pub const fn with(ty: u16) -> Self { Self(ty) }
+    pub const fn with(ty: u16) -> Self {
+        Self(ty)
+    }
     #[inline]
-    pub fn to_le_bytes(&self) -> [u8; 2] { self.0.to_le_bytes() }
+    pub fn to_le_bytes(&self) -> [u8; 2] {
+        self.0.to_le_bytes()
+    }
 
     pub const ASSET: Self = AssignmentType(4000);
-    pub fn is_asset(self) -> bool { self == Self::ASSET }
+    pub fn is_asset(self) -> bool {
+        self == Self::ASSET
+    }
 }
 
 pub type MetaSchema = TinyOrdSet<MetaType>;
@@ -86,7 +92,9 @@ impl OpFullType {
         }
     }
 
-    pub fn is_transition(self) -> bool { matches!(self, Self::StateTransition(_)) }
+    pub fn is_transition(self) -> bool {
+        matches!(self, Self::StateTransition(_))
+    }
 }
 
 /// Trait defining common API for all operation type schemata
@@ -135,22 +143,38 @@ impl DefaultBasedStrictDumb for TransitionSchema {}
 
 impl OpSchema for GenesisSchema {
     #[inline]
-    fn metadata(&self) -> &MetaSchema { &self.metadata }
+    fn metadata(&self) -> &MetaSchema {
+        &self.metadata
+    }
     #[inline]
-    fn globals(&self) -> &GlobalSchema { &self.globals }
+    fn globals(&self) -> &GlobalSchema {
+        &self.globals
+    }
     #[inline]
-    fn inputs(&self) -> Option<&InputsSchema> { None }
+    fn inputs(&self) -> Option<&InputsSchema> {
+        None
+    }
     #[inline]
-    fn assignments(&self) -> &AssignmentsSchema { &self.assignments }
+    fn assignments(&self) -> &AssignmentsSchema {
+        &self.assignments
+    }
 }
 
 impl OpSchema for TransitionSchema {
     #[inline]
-    fn metadata(&self) -> &MetaSchema { &self.metadata }
+    fn metadata(&self) -> &MetaSchema {
+        &self.metadata
+    }
     #[inline]
-    fn globals(&self) -> &GlobalSchema { &self.globals }
+    fn globals(&self) -> &GlobalSchema {
+        &self.globals
+    }
     #[inline]
-    fn inputs(&self) -> Option<&AssignmentsSchema> { Some(&self.inputs) }
+    fn inputs(&self) -> Option<&AssignmentsSchema> {
+        Some(&self.inputs)
+    }
     #[inline]
-    fn assignments(&self) -> &AssignmentsSchema { &self.assignments }
+    fn assignments(&self) -> &AssignmentsSchema {
+        &self.assignments
+    }
 }

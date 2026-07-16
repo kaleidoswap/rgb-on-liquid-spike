@@ -58,11 +58,15 @@ pub struct Opout {
 impl CommitEncode for Opout {
     type CommitmentId = MerkleHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl Opout {
-    pub fn new(op: OpId, ty: AssignmentType, no: u16) -> Opout { Opout { op, ty, no } }
+    pub fn new(op: OpId, ty: AssignmentType, no: u16) -> Opout {
+        Opout { op, ty, no }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
@@ -165,14 +169,18 @@ impl<'a> IntoIterator for &'a Inputs {
     type Item = Opout;
     type IntoIter = iter::Copied<btree_set::Iter<'a, Opout>>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.iter().copied() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter().copied()
+    }
 }
 
 impl MerkleLeaves for Inputs {
     type Leaf = Opout;
     type LeafIter<'tmp> = <TinyOrdSet<Opout> as MerkleLeaves>::LeafIter<'tmp>;
 
-    fn merkle_leaves(&self) -> Self::LeafIter<'_> { self.0.merkle_leaves() }
+    fn merkle_leaves(&self) -> Self::LeafIter<'_> {
+        self.0.merkle_leaves()
+    }
 }
 
 /// RGB contract operation API, defined as trait
@@ -250,7 +258,9 @@ pub trait Operation {
         }
     }
 
-    fn disclose_hash(&self) -> DiscloseHash { self.disclose().commit_id() }
+    fn disclose_hash(&self) -> DiscloseHash {
+        self.disclose().commit_id()
+    }
 }
 
 /// An ASCII printable string up to 4096 chars representing identity of the
@@ -276,17 +286,23 @@ pub struct Identity(RString<AsciiPrintable, AsciiPrintable, 1, 4096>);
 impl CommitEncode for Identity {
     type CommitmentId = StrictHash;
 
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self); }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self);
+    }
 }
 
 impl DefaultBasedStrictDumb for Identity {}
 
 impl Default for Identity {
-    fn default() -> Self { Self::from("ssi:anonymous") }
+    fn default() -> Self {
+        Self::from("ssi:anonymous")
+    }
 }
 
 impl From<&'static str> for Identity {
-    fn from(s: &'static str) -> Self { Self(RString::from(s)) }
+    fn from(s: &'static str) -> Self {
+        Self(RString::from(s))
+    }
 }
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display)]
@@ -367,47 +383,69 @@ impl StrictSerialize for Transition {}
 impl StrictDeserialize for Transition {}
 
 impl Hash for Transition {
-    fn hash<H: Hasher>(&self, state: &mut H) { state.write(self.id().as_slice()) }
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(self.id().as_slice())
+    }
 }
 
 impl CommitEncode for Genesis {
     type CommitmentId = OpId;
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self.commit()) }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self.commit())
+    }
 }
 
 impl CommitEncode for Transition {
     type CommitmentId = OpId;
-    fn commit_encode(&self, e: &mut CommitEngine) { e.commit_to_serialized(&self.commit()) }
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self.commit())
+    }
 }
 
 impl Transition {
     /// Returns reference to information about the owned rights in form of
     /// [`Inputs`] wrapper structure which this operation updates with
     /// state transition ("parent owned rights").
-    pub fn inputs(&self) -> &Inputs { &self.inputs }
+    pub fn inputs(&self) -> &Inputs {
+        &self.inputs
+    }
 }
 
 impl Operation for Genesis {
     #[inline]
-    fn full_type(&self) -> OpFullType { OpFullType::Genesis }
+    fn full_type(&self) -> OpFullType {
+        OpFullType::Genesis
+    }
 
     #[inline]
-    fn id(&self) -> OpId { self.commit_id() }
+    fn id(&self) -> OpId {
+        self.commit_id()
+    }
 
     #[inline]
-    fn contract_id(&self) -> ContractId { ContractId::from_inner(self.id().into_inner()) }
+    fn contract_id(&self) -> ContractId {
+        ContractId::from_inner(self.id().into_inner())
+    }
 
     #[inline]
-    fn nonce(&self) -> u64 { u64::MAX }
+    fn nonce(&self) -> u64 {
+        u64::MAX
+    }
 
     #[inline]
-    fn metadata(&self) -> &Metadata { &self.metadata }
+    fn metadata(&self) -> &Metadata {
+        &self.metadata
+    }
 
     #[inline]
-    fn globals(&self) -> &GlobalState { &self.globals }
+    fn globals(&self) -> &GlobalState {
+        &self.globals
+    }
 
     #[inline]
-    fn assignments(&self) -> AssignmentsRef<'_> { (&self.assignments).into() }
+    fn assignments(&self) -> AssignmentsRef<'_> {
+        (&self.assignments).into()
+    }
 
     #[inline]
     fn assignments_by_type(&self, t: AssignmentType) -> Option<TypedAssigns<GraphSeal>> {
@@ -419,25 +457,39 @@ impl Operation for Genesis {
 
 impl Operation for Transition {
     #[inline]
-    fn full_type(&self) -> OpFullType { OpFullType::StateTransition(self.transition_type) }
+    fn full_type(&self) -> OpFullType {
+        OpFullType::StateTransition(self.transition_type)
+    }
 
     #[inline]
-    fn id(&self) -> OpId { self.commit_id() }
+    fn id(&self) -> OpId {
+        self.commit_id()
+    }
 
     #[inline]
-    fn contract_id(&self) -> ContractId { self.contract_id }
+    fn contract_id(&self) -> ContractId {
+        self.contract_id
+    }
 
     #[inline]
-    fn nonce(&self) -> u64 { self.nonce }
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
 
     #[inline]
-    fn metadata(&self) -> &Metadata { &self.metadata }
+    fn metadata(&self) -> &Metadata {
+        &self.metadata
+    }
 
     #[inline]
-    fn globals(&self) -> &GlobalState { &self.globals }
+    fn globals(&self) -> &GlobalState {
+        &self.globals
+    }
 
     #[inline]
-    fn assignments(&self) -> AssignmentsRef<'_> { (&self.assignments).into() }
+    fn assignments(&self) -> AssignmentsRef<'_> {
+        (&self.assignments).into()
+    }
 
     #[inline]
     fn assignments_by_type(&self, t: AssignmentType) -> Option<TypedAssigns<GraphSeal>> {

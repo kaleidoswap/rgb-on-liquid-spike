@@ -49,6 +49,12 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
   (`demo_mint_gate_burn.sh`) replaces the vault with a provable burn: a single
   OP_RETURN output is both the RGB anchor and the destruction of the backing
   tranche, so there is no vault and no key, at the cost of redeemability.
+- A **round-trip atomic swap** (`demo_swap_roundtrip.sh`): a Bitcoin
+  RGB20 and a Liquid RGB20 swap owners via shared-preimage HTLCs whose
+  claims are RGB-wrapped, then swap BACK under a fresh preimage. The
+  return legs are chained transfers (`rgb20-transfer --consume-opid`).
+  Assets never leave their issuance chains; ownership crosses twice;
+  six anchors verified through the patched consensus on both chains.
 - A **backing-aware RGB schema** (`demo_backed_schema.sh`): BFA (Backed
   Fungible Asset) = IFA plus backing terms (vault script, backing asset,
   rate) committed in genesis, so the terms are part of the contract id.
@@ -110,6 +116,7 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/demo_mint_gate_burn.sh # Simplicity mint-gate (burn): mint against a provable burn
 ./scripts/demo_staking.sh       # Simplicity time-locked staking covenant
 ./scripts/demo_backed_schema.sh # BFA backing-aware schema + full-history audit
+./scripts/demo_swap_roundtrip.sh # BTC RGB20 <-> Liquid RGB20 swap, there and back
 
 ./scripts/teardown.sh           # stop the nodes and wipe state
 ```

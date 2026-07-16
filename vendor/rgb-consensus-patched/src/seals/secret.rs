@@ -49,7 +49,9 @@ impl CommitmentId for SecretSeal {
 }
 
 impl From<Sha256> for SecretSeal {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+    fn from(hasher: Sha256) -> Self {
+        hasher.finish().into()
+    }
 }
 
 impl DisplayBaid64 for SecretSeal {
@@ -58,15 +60,21 @@ impl DisplayBaid64 for SecretSeal {
     const PREFIX: bool = true;
     const EMBED_CHECKSUM: bool = true;
     const MNEMONIC: bool = false;
-    fn to_baid64_payload(&self) -> [u8; 32] { self.to_byte_array() }
+    fn to_baid64_payload(&self) -> [u8; 32] {
+        self.to_byte_array()
+    }
 }
 impl FromBaid64Str for SecretSeal {}
 impl FromStr for SecretSeal {
     type Err = Baid64ParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_baid64_str(s) }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_baid64_str(s)
+    }
 }
 impl Display for SecretSeal {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { self.fmt_baid64(f) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_baid64(f)
+    }
 }
 
 #[cfg(test)]
