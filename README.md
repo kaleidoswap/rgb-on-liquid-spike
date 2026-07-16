@@ -49,6 +49,14 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
   (`demo_mint_gate_burn.sh`) replaces the vault with a provable burn: a single
   OP_RETURN output is both the RGB anchor and the destruction of the backing
   tranche, so there is no vault and no key, at the cost of redeemability.
+- A **backing-aware RGB schema** (`demo_backed_schema.sh`): BFA (Backed
+  Fungible Asset) = IFA plus backing terms (vault script, backing asset,
+  rate) committed in genesis, so the terms are part of the contract id.
+  `bfa-audit` rebuilds a contract's whole mint history and checks every
+  mint against the chain: seal closed, anchor matches the committed
+  transition, and vault locked >= minted x rate. An over-mint the chain
+  happily confirms fails the backing rule; a history edited to hide it
+  fails the anchor match. No oracle.
 - A **time-locked staking covenant** (`demo_staking.sh`): a staked RGB
   position that consensus locks until a maturity height and binds to return
   to the staker. It cannot be unstaked early (absolute time lock), redirected
@@ -101,6 +109,7 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/demo_mint_gate.sh     # Simplicity mint-gate (lock): permissionless backed minting
 ./scripts/demo_mint_gate_burn.sh # Simplicity mint-gate (burn): mint against a provable burn
 ./scripts/demo_staking.sh       # Simplicity time-locked staking covenant
+./scripts/demo_backed_schema.sh # BFA backing-aware schema + full-history audit
 
 ./scripts/teardown.sh           # stop the nodes and wipe state
 ```

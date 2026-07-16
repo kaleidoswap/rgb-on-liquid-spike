@@ -119,12 +119,36 @@ pub fn build_mint(
     recipient_seal: OutPoint,
     new_gate_seal: Option<OutPoint>,
 ) -> Result<(BundleId, Transition)> {
+    build_mint_with(
+        InflatableFungibleAsset::schema(),
+        InflatableFungibleAsset::types(),
+        contract_id,
+        gate_opid,
+        gate_opout_no,
+        allowance_before,
+        mint_amount,
+        recipient_seal,
+        new_gate_seal,
+    )
+}
+
+/// [`build_mint`] under a caller-supplied schema (IFA or BFA — both
+/// share the `inflate` transition and its AluVM arithmetic).
+#[allow(clippy::too_many_arguments)]
+pub fn build_mint_with(
+    schema: rgbcore::Schema,
+    types: strict_types::TypeSystem,
+    contract_id: ContractId,
+    gate_opid: OpId,
+    gate_opout_no: u16,
+    allowance_before: u64,
+    mint_amount: u64,
+    recipient_seal: OutPoint,
+    new_gate_seal: Option<OutPoint>,
+) -> Result<(BundleId, Transition)> {
     let remaining = allowance_before
         .checked_sub(mint_amount)
         .context("mint exceeds allowance")?;
-
-    let schema = InflatableFungibleAsset::schema();
-    let types = InflatableFungibleAsset::types();
 
     let mut builder =
         TransitionBuilder::named_transition(contract_id, schema, FieldName::from("inflate"), types)

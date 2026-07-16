@@ -10,6 +10,7 @@
 //! `vendor/rgb-consensus-patched/` and `docs/RFC_RGB_ON_LIQUID.md`).
 
 pub mod anchor;
+pub mod bfa;
 pub mod bundle;
 pub mod liquid_dbc;
 pub mod mint;

@@ -210,6 +210,59 @@ enum Cmd {
         chain_net: String,
     },
 
+    /// Mint under the BFA (Backed Fungible Asset) schema: IFA plus
+    /// contract-committed backing terms in genesis. Same outputs as
+    /// `ifa-mint` (addr, mpc root, transition OpId on stdout).
+    BfaMint {
+        #[arg(long, default_value = "LiquidRgbUSD")]
+        name: String,
+        #[arg(long, default_value = "LRUSD")]
+        ticker: String,
+        #[arg(long, default_value_t = 1_000_000)]
+        max_supply: u64,
+        /// Canonical backing terms committed in genesis:
+        /// `elements-backing:v1;vault=<spk>;asset=<id>;rate=<n>/<d>`.
+        #[arg(long)]
+        backing: String,
+        #[arg(long, default_value_t = 250_000)]
+        mint: u64,
+        #[arg(long)]
+        gate_seal: String,
+        #[arg(long)]
+        recipient_seal: String,
+        #[arg(long)]
+        new_gate_seal: Option<String>,
+        #[arg(long)]
+        orig_gate_seal: Option<String>,
+        #[arg(long)]
+        consume_opid: Option<String>,
+        #[arg(long)]
+        allowance: Option<u64>,
+        #[arg(
+            long,
+            default_value = "d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d"
+        )]
+        internal_key: String,
+        #[arg(long, default_value_t = 0xC0FFEE_u64)]
+        entropy: u64,
+        #[arg(long, default_value = "liquid-testnet")]
+        chain_net: String,
+    },
+
+    /// Audit a BFA contract's FULL mint history against the chain.
+    /// Rebuilds the committed history (genesis with backing terms,
+    /// every mint transition) from the history file, then checks for
+    /// every mint: the gate seal was closed by its witness tx, the
+    /// witness tx carries the anchor commitment, and the vault locked
+    /// at least `minted × rate` of the backing asset. Any lie in the
+    /// history file breaks the anchor match; any under-backed mint
+    /// fails the backing rule. Exits non-zero if any mint fails.
+    BfaAudit {
+        /// JSON history file; see `bfa_history` in scripts/.
+        #[arg(long)]
+        history: std::path::PathBuf,
+    },
+
     /// Verify a backed mint: the standard anchor + seal checks, plus
     /// the backing rule: the witness tx must lock >= `required` units
     /// of `backing_asset` into the `vault_spk` output.
@@ -423,10 +476,11 @@ async fn main() -> Result<()> {
             internal_key,
             entropy,
             chain_net,
-        } => ifa_mint(
+        } => mint_flow(
             &name,
             &ticker,
             max_supply,
+            None,
             mint,
             &gate_seal,
             &recipient_seal,
@@ -438,6 +492,38 @@ async fn main() -> Result<()> {
             entropy,
             &chain_net,
         ),
+        Cmd::BfaMint {
+            name,
+            ticker,
+            max_supply,
+            backing,
+            mint,
+            gate_seal,
+            recipient_seal,
+            new_gate_seal,
+            orig_gate_seal,
+            consume_opid,
+            allowance,
+            internal_key,
+            entropy,
+            chain_net,
+        } => mint_flow(
+            &name,
+            &ticker,
+            max_supply,
+            Some(&backing),
+            mint,
+            &gate_seal,
+            &recipient_seal,
+            new_gate_seal.as_deref(),
+            orig_gate_seal.as_deref(),
+            consume_opid.as_deref(),
+            allowance,
+            &internal_key,
+            entropy,
+            &chain_net,
+        ),
+        Cmd::BfaAudit { history } => bfa_audit(&history).await,
         Cmd::VerifyBackedMint {
             anchor,
             vault_spk,
@@ -1005,10 +1091,11 @@ fn build(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn ifa_mint(
+fn mint_flow(
     name: &str,
     ticker: &str,
     max_supply: u64,
+    backing: Option<&str>,
     mint_amount: u64,
     gate_seal_s: &str,
     recipient_seal_s: &str,
@@ -1020,8 +1107,12 @@ fn ifa_mint(
     entropy: u64,
     chain_net_s: &str,
 ) -> Result<()> {
-    use spike_rgb_anchor::mint;
+    use spike_rgb_anchor::{bfa, mint};
 
+    let terms = backing
+        .map(bfa::BackingTerms::from_canonical)
+        .transpose()
+        .context("parsing --backing")?;
     let p = parse32(internal_key_hex, "internal_key")?;
     let gate_seal = parse_outpoint(gate_seal_s)?;
     let recipient_seal = parse_outpoint(recipient_seal_s)?;
@@ -1034,8 +1125,9 @@ fn ifa_mint(
         other => anyhow::bail!("unsupported chain_net for ifa-mint: {other}"),
     };
 
+    let kind = if terms.is_some() { "BFA" } else { "IFA" };
     eprintln!("──────────────────────────────────────────────────────────");
-    eprintln!(" IFA backed mint — chain_net = {chain_net}");
+    eprintln!(" {kind} backed mint — chain_net = {chain_net}");
     eprintln!("──────────────────────────────────────────────────────────");
 
     // Step 1: (re-)derive the IFA. The contract is defined by the
@@ -1045,8 +1137,14 @@ fn ifa_mint(
         .map(parse_outpoint)
         .transpose()?
         .unwrap_or(gate_seal);
-    let issuance = mint::issue_ifa(chain_net, name, ticker, max_supply, issuance_seal)?;
+    let issuance = match &terms {
+        Some(t) => bfa::issue_bfa(chain_net, name, ticker, max_supply, issuance_seal, t)?,
+        None => mint::issue_ifa(chain_net, name, ticker, max_supply, issuance_seal)?,
+    };
     eprintln!(" contract    : {}", issuance.contract_id);
+    if let Some(t) = &terms {
+        eprintln!(" backing     : {}", t.to_canonical());
+    }
     eprintln!(" gate seal   : {}:{}", gate_seal.txid, gate_seal.vout);
     eprintln!(" max supply  : {max_supply} {ticker} (0 issued at genesis)");
 
@@ -1058,15 +1156,26 @@ fn ifa_mint(
         None => rgbcore::OpId::from(issuance.contract_id.to_byte_array()),
     };
     let allowance_before = allowance.unwrap_or(max_supply);
-    let (bundle_id, transition) = mint::build_mint(
-        issuance.contract_id,
-        consume_opid,
-        0,
-        allowance_before,
-        mint_amount,
-        recipient_seal,
-        new_gate_seal,
-    )?;
+    let (bundle_id, transition) = match &terms {
+        Some(_) => bfa::build_bfa_mint(
+            issuance.contract_id,
+            consume_opid,
+            0,
+            allowance_before,
+            mint_amount,
+            recipient_seal,
+            new_gate_seal,
+        )?,
+        None => mint::build_mint(
+            issuance.contract_id,
+            consume_opid,
+            0,
+            allowance_before,
+            mint_amount,
+            recipient_seal,
+            new_gate_seal,
+        )?,
+    };
     eprintln!(" bundle_id   : {}", hex::encode(bundle_id.to_byte_array()));
     eprintln!(
         " minting     : {} {} to seal {}:{}",
@@ -1082,7 +1191,7 @@ fn ifa_mint(
         );
     }
     eprintln!(
-        " transition  : {} (TS_INFLATION, validated by IFA's AluVM)",
+        " transition  : {} (TS_INFLATION, validated by the schema's AluVM)",
         hex::encode(transition.commit_id().to_byte_array()),
     );
 
@@ -1118,7 +1227,7 @@ fn ifa_mint(
         entries: vec![AnchorEntry {
             protocol_id_hex: hex::encode(pid),
             message_hex: hex::encode(msg),
-            label: format!("ifa-mint:{ticker}"),
+            label: format!("{}-mint:{ticker}", kind.to_lowercase()),
         }],
         layer1: format!("{}", chain_net.layer1()),
         chain_net: format!("{chain_net}"),
@@ -1134,6 +1243,186 @@ fn ifa_mint(
     // Third stdout line: this transition's OpId, so a chained mint can
     // consume the allowance it re-assigned (`--consume-opid`).
     println!("{}", hex::encode(transition.commit_id().to_byte_array()));
+    Ok(())
+}
+
+/// One mint in a BFA audit history file.
+#[derive(serde::Deserialize)]
+struct BfaHistoryMint {
+    mint: u64,
+    recipient_seal: String,
+    new_gate_seal: Option<String>,
+    witness_txid: String,
+}
+
+/// A BFA contract's claimed history: the issuance parameters (which
+/// pin the contract id, backing terms included) and every mint. The
+/// auditor rebuilds the committed operations from these parameters;
+/// any divergence from what was actually anchored on chain shows up
+/// as an anchor mismatch.
+#[derive(serde::Deserialize)]
+struct BfaHistory {
+    name: String,
+    ticker: String,
+    max_supply: u64,
+    backing: String,
+    genesis_gate_seal: String,
+    internal_key: String,
+    entropy: u64,
+    #[serde(default = "default_chain_net")]
+    chain_net: String,
+    mints: Vec<BfaHistoryMint>,
+}
+
+fn default_chain_net() -> String {
+    "liquid-testnet".to_owned()
+}
+
+/// Audit a BFA contract's full mint history against the chain: for
+/// every mint, the gate seal must be closed by the mint's witness tx,
+/// the witness tx must carry the anchor commitment to the rebuilt
+/// (committed) transition, and the vault must have locked at least
+/// `minted × rate` of the backing asset per the genesis terms.
+async fn bfa_audit(history_path: &std::path::Path) -> Result<()> {
+    use spike_rgb_anchor::bfa;
+
+    let s = std::fs::read_to_string(history_path).context("reading history file")?;
+    let history: BfaHistory = serde_json::from_str(&s).context("parsing history file")?;
+    let terms = bfa::BackingTerms::from_canonical(&history.backing)?;
+    let chain_net = parse_chain_net(&history.chain_net)?;
+    let p = parse32(&history.internal_key, "internal_key")?;
+    let genesis_gate = parse_outpoint(&history.genesis_gate_seal)?;
+
+    let issuance = bfa::issue_bfa(
+        chain_net,
+        &history.name,
+        &history.ticker,
+        history.max_supply,
+        genesis_gate,
+        &terms,
+    )?;
+
+    eprintln!("──────────────────────────────────────────────────────────");
+    eprintln!(" BFA full-history audit — {} mints", history.mints.len());
+    eprintln!(" contract : {}", issuance.contract_id);
+    eprintln!(" backing  : {}", terms.to_canonical());
+    eprintln!("──────────────────────────────────────────────────────────");
+
+    let rpc = spike_env::elements_rpc::ElementsRpc::from_defaults();
+    let mut consume_opid = rgbcore::OpId::from(issuance.contract_id.to_byte_array());
+    let mut allowance = history.max_supply;
+    let mut gate = genesis_gate;
+    let mut failures = 0usize;
+
+    for (i, m) in history.mints.iter().enumerate() {
+        let n = i + 1;
+        let recipient = parse_outpoint(&m.recipient_seal)?;
+        let new_gate = m.new_gate_seal.as_deref().map(parse_outpoint).transpose()?;
+
+        // Rebuild the committed transition from the claimed parameters.
+        let (bundle_id, transition) = bfa::build_bfa_mint(
+            issuance.contract_id,
+            consume_opid,
+            0,
+            allowance,
+            m.mint,
+            recipient,
+            new_gate,
+        )?;
+
+        // Recompute the anchor commitment for that transition.
+        let entries = vec![mpc::Entry {
+            protocol_id: issuance.contract_id.to_byte_array(),
+            message: bundle_id.to_byte_array(),
+        }];
+        let (root, _) = mpc::build(&entries, history.entropy)?;
+        let committed = liquid_dbc::commit(p, root)?;
+
+        // Fetch the witness transaction from the chain.
+        let raw = rpc
+            .call("getrawtransaction", serde_json::json!([m.witness_txid]))
+            .await
+            .with_context(|| format!("mint #{n}: fetching witness tx {}", m.witness_txid))?;
+        let raw_hex = raw
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("getrawtransaction returned non-string"))?;
+        let witness_tx: elements::Transaction =
+            elements::encode::deserialize(&hex::decode(raw_hex).context("witness tx hex")?)
+                .map_err(|e| anyhow::anyhow!("deserialize witness tx: {e}"))?;
+
+        eprintln!(
+            " mint #{n}: {} {} (witness {})",
+            m.mint, history.ticker, m.witness_txid
+        );
+
+        // 1. Seal closure: the witness tx spends the gate seal.
+        let closes_gate = witness_tx.input.iter().any(|txin| {
+            txin.previous_output.txid.to_string() == gate.txid.to_string()
+                && txin.previous_output.vout == gate.vout
+        });
+        if closes_gate {
+            eprintln!(
+                "   ✓ gate seal {}:{} closed by witness tx",
+                gate.txid, gate.vout
+            );
+        } else {
+            eprintln!(
+                "   ✗ SEAL: witness tx does not spend gate seal {}:{}",
+                gate.txid, gate.vout
+            );
+            failures += 1;
+        }
+
+        // 2. Anchor: the witness tx pays the recomputed commitment.
+        let anchored = witness_tx
+            .output
+            .iter()
+            .any(|o| hex::encode(o.script_pubkey.as_bytes()) == committed.committed_spk_hex);
+        if anchored {
+            eprintln!("   ✓ anchor commitment matches the rebuilt transition");
+        } else {
+            eprintln!(
+                "   ✗ ANCHOR: no output pays the commitment for this history — \
+                 the claimed history does not match what was anchored"
+            );
+            failures += 1;
+        }
+
+        // 3. The backing rule (only meaningful against a matching anchor).
+        if anchored {
+            match bfa::audit_mint(&terms, &transition, &witness_tx) {
+                Ok(a) => eprintln!(
+                    "   ✓ backing: minted {} requires {}, vault locked {}",
+                    a.minted, a.required, a.locked
+                ),
+                Err(e) => {
+                    eprintln!("   ✗ BACKING: {e}");
+                    failures += 1;
+                }
+            }
+        }
+
+        consume_opid = transition.commit_id();
+        allowance = allowance
+            .checked_sub(m.mint)
+            .context("history mints exceed max supply")?;
+        gate = match new_gate {
+            Some(g) => g,
+            None => {
+                anyhow::ensure!(
+                    i == history.mints.len() - 1 || allowance == 0,
+                    "mint #{n} has no new gate seal but allowance remains"
+                );
+                gate
+            }
+        };
+    }
+
+    eprintln!("──────────────────────────────────────────────────────────");
+    if failures > 0 {
+        anyhow::bail!("audit FAILED: {failures} check(s) failed");
+    }
+    println!("audit OK: {} mints, fully backed", history.mints.len());
     Ok(())
 }
 
