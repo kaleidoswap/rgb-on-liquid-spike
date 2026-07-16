@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RGB assets on Liquid, explained &mdash; KaleidoSwap R&amp;D</title>
+<meta name="description" content="Can Bitcoin-native RGB assets live on the Liquid sidechain, and can a token move between chains? A working proof of concept: native anchors, Simplicity covenants, provably backed issuance, and round-trip atomic swaps.">
+<meta property="og:title" content="RGB assets on Liquid, explained">
+<meta property="og:description" content="A working proof of concept: native RGB anchors on Liquid, Simplicity covenants, provably backed issuance, and round-trip atomic swaps.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128142;</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  img, canvas, svg { max-width: 100%; }
+</style>
+</head>
+<body>
+<style>
+  :root {
+    --bg: #0D1813;
+    --bg2: #0a120e;
+    --card: #12130f;
+    --border: rgba(255,255,255,0.09);
+    --text: #ECEFEA;
+    --muted: #97A29A;
+    --green: #15E99A;
+    --green-soft: #6EEDC0;
+    --violet: #8b63ff;
+    --violet-soft: #A48AFF;
+    --grad: linear-gradient(135deg, #15E99A 0%, #6F32FF 100%);
+    --ok: #15E99A;
+    --warn: #F5B23B;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #F4F5F2;
+      --bg2: #ECEEE9;
+      --card: #FFFFFF;
+      --border: rgba(13,24,19,0.12);
+      --text: #14201A;
+      --muted: #5C6660;
+      --green: #0E9E6B;
+      --green-soft: #0E9E6B;
+      --violet: #5B29D9;
+      --violet-soft: #5B29D9;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1813; --bg2: #0a120e; --card: #12130f; --border: rgba(255,255,255,0.09);
+    --text: #ECEFEA; --muted: #97A29A; --green: #15E99A; --green-soft: #6EEDC0;
+    --violet: #8b63ff; --violet-soft: #A48AFF;
+  }
+  :root[data-theme="light"] {
+    --bg: #F4F5F2; --bg2: #ECEEE9; --card: #FFFFFF; --border: rgba(13,24,19,0.12);
+    --text: #14201A; --muted: #5C6660; --green: #0E9E6B; --green-soft: #0E9E6B;
+    --violet: #5B29D9; --violet-soft: #5B29D9;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.65;
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .strip { height: 4px; background: var(--grad); }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+  .col { max-width: 680px; }
+
+  /* ---- rhythm ---- */
+  section { padding: 46px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  h1, h2, h3 { line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
+  h1 { font-size: clamp(2.1rem, 6vw, 3.1rem); margin: 0 0 18px; font-weight: 800; }
+  h2 { font-size: clamp(1.5rem, 3.5vw, 2rem); margin: 0 0 14px; font-weight: 700; }
+  h3 { font-size: 1.12rem; margin: 0 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+  p { margin: 0 0 16px; }
+  a { color: var(--green); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--green) 35%, transparent); }
+  a:hover { border-bottom-color: var(--green); }
+  strong { color: var(--text); font-weight: 680; }
+  code { font-family: var(--mono); font-size: 0.86em; background: color-mix(in srgb, var(--text) 8%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 0.08em 0.36em; }
+
+  /* ---- eyebrow ---- */
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); }
+  .dot.v { background: var(--violet); box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 18%, transparent); }
+
+  /* ---- hero ---- */
+  .hero { padding-top: 40px; }
+  .hero p.lede { font-size: 1.18rem; color: var(--text); max-width: 660px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.04em; color: var(--green-soft); background: color-mix(in srgb, var(--green) 12%, transparent); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); border-radius: 999px; padding: 5px 13px; }
+  figure { margin: 26px 0 0; }
+  figure img { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 14px; background: #0D1813; }
+  figcaption { font-size: 13.5px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  /* ---- answer callout ---- */
+  .callout { background: var(--card); border: 1px solid var(--border); border-left: 3px solid transparent; border-image: var(--grad) 1; border-radius: 0 12px 12px 0; padding: 22px 24px; }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ---- cards ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 8px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 20px; }
+  .card .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 9px; }
+  .card p { font-size: 14.5px; color: var(--muted); margin: 0; }
+  .card p + p { margin-top: 8px; }
+
+  /* two-approach compare */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+  @media (max-width: 620px) { .compare { grid-template-columns: 1fr; } }
+  .approach { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .approach h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .tag.ok { color: #04140d; background: var(--green); }
+  .tag.trust { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
+  .approach p { font-size: 14.5px; color: var(--muted); margin: 10px 0 0; }
+
+  /* qa */
+  .qa { margin-top: 6px; }
+  .qa details { border-bottom: 1px solid var(--border); padding: 4px 0; }
+  .qa summary { cursor: pointer; list-style: none; padding: 13px 2px; font-weight: 620; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+  .qa summary::-webkit-details-marker { display: none; }
+  .qa summary::after { content: "+"; font-family: var(--mono); color: var(--green); font-size: 1.2rem; transition: transform .18s; }
+  .qa details[open] summary::after { transform: rotate(45deg); }
+  .qa .ans { padding: 0 2px 15px; color: var(--muted); font-size: 15px; }
+  .qa .ans p { margin: 0 0 10px; }
+  .qa .ans p:last-child { margin: 0; }
+
+  ul.clean { margin: 0; padding: 0; list-style: none; }
+  ul.clean li { position: relative; padding-left: 24px; margin-bottom: 11px; color: var(--muted); }
+  ul.clean li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 8px; height: 8px; border-radius: 2px; background: var(--grad); }
+  ul.clean li strong { color: var(--text); }
+
+  footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; }
+  footer .links { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-bottom: 20px; }
+  footer .note { border: 1px dashed var(--border); border-radius: 10px; padding: 14px 16px; }
+
+  /* ---- motion system ---- */
+  .strip { background-size: 220% 100%; animation: stripFlow 6s linear infinite; }
+  @keyframes stripFlow { 0% { background-position: 0% 0; } 100% { background-position: 220% 0; } }
+
+  .fx { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
+  .fx.in { opacity: 1; transform: none; }
+  .hero .fx:nth-child(1) { transition-delay: .05s; }
+  .hero .fx:nth-child(2) { transition-delay: .15s; }
+  .hero .fx:nth-child(3) { transition-delay: .25s; }
+  .hero .fx:nth-child(4) { transition-delay: .35s; }
+  .hero .fx:nth-child(5) { transition-delay: .45s; }
+
+  .card, .approach { transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease; }
+  .card:hover, .approach:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--green) 55%, transparent); }
+  .approach:nth-child(2):hover { border-color: color-mix(in srgb, var(--violet) 45%, var(--border)); box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--violet) 55%, transparent); }
+
+  .qa .ans { animation: qaIn .28s ease; }
+  @keyframes qaIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+  .dot { animation: dotPulse 2.6s ease-in-out infinite; }
+  @keyframes dotPulse { 0%,100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--green) 8%, transparent); } }
+
+  .heroCanvas { margin-top: 26px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: #0D1813; position: relative; }
+  .heroCanvas::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--grad); z-index: 2; }
+  .heroCanvas canvas { display: block; width: 100%; height: auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .strip, .dot, .qa .ans { animation: none !important; }
+    .fx { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .card, .approach { transition: none; }
+    .card:hover, .approach:hover { transform: none; }
+  }
+
+</style>
+
+<div class="strip"></div>
+
+<header class="wrap hero">
+  <section style="border-bottom:none; padding-bottom: 8px;">
+    <div class="eyebrow fx"><span class="dot"></span> KaleidoSwap &middot; Engineering R&amp;D</div>
+    <h1 class="fx">RGB assets on Liquid, explained</h1>
+    <p class="lede fx">Can Bitcoin-native RGB assets also live on the Liquid sidechain, and can a token move between chains? We built a working proof of concept to find out. Here is the honest answer.</p>
+    <div class="fx" style="margin: 4px 0 6px;"><span class="pill"><span class="dot"></span> Proof of concept &middot; open source &middot; testnet only</span></div>
+    <div class="heroCanvas fx"><canvas id="kal" width="1200" height="630" role="img" aria-label="Animated kaleidoscope: two chains of diamonds, green and violet, pulsing toward a shared glowing facet"></canvas></div>
+  </section>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <div class="callout col fx">
+      <p><strong>The short version.</strong> Running RGB assets on Liquid works, and we proved it with a small, non-breaking change and exercised it end to end. Moving an existing token <em>between</em> Bitcoin and Liquid can't be a native "teleport," but you get the same result two ways: a <strong>trustless atomic swap</strong> (no custodian), or a <strong>lock-and-mint bridge</strong> (one canonical token, but it trusts a federation).</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot v"></span> Background</div>
+      <h2>What RGB is, in two layers</h2>
+      <p>RGB is an asset protocol for Bitcoin. What makes it different is that an asset's whole history lives <strong>off-chain</strong>, held and checked by the people who own it. Only a tiny fingerprint ever touches the blockchain.</p>
+      <p>That fingerprint is the <strong>anchor</strong>: every transfer is bound to a real transaction by spending a single-use coin (a "seal") that carries a 32-byte commitment. The off-chain part doesn't care which blockchain it runs on; only the anchor does. That's the whole reason RGB can move to Liquid at all.</p>
+    </div>
+    <figure class="fx">
+      <img alt="RGB's two layers: off-chain contract state above, the on-chain anchor below, joined by a single seal" src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTIwMCA2NzUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgZm9udC1mYW1pbHk9IlNhdG9zaGksIHN5c3RlbS11aSwgc2Fucy1zZXJpZiIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJSR0IncyB0d28gbGF5ZXJzOiBjbGllbnQtc2lkZSB2YWxpZGF0aW9uIG9mZi1jaGFpbiwgYW5kIHRoZSBhbmNob3IgbGF5ZXIgb24tY2hhaW4sIGNvbm5lY3RlZCBieSBhIHNpbmdsZSBzZWFsIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ3YiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMTVFOTlBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzZGMzJGRiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic3RyaXAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iMCIgeTE9IjAiIHgyPSIxMjAwIiB5Mj0iNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE1RTk5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM2RjMyRkYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJlYW0iIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iNjEwIiB5MT0iMjMwIiB4Mj0iNjEwIiB5Mj0iNDcwIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNkYzMkZGIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE1RTk5QSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxmaWx0ZXIgaWQ9InNvZnQiIHg9Ii02MCUiIHk9Ii02MCUiIHdpZHRoPSIyMjAlIiBoZWlnaHQ9IjIyMCUiPgogICAgICA8ZmVHYXVzc2lhbkJsdXIgc3RkRGV2aWF0aW9uPSIzIiByZXN1bHQ9ImIiLz4KICAgICAgPGZlTWVyZ2U+PGZlTWVyZ2VOb2RlIGluPSJiIi8+PGZlTWVyZ2VOb2RlIGluPSJTb3VyY2VHcmFwaGljIi8+PC9mZU1lcmdlPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90cyIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPGNpcmNsZSBjeD0iMS4yIiBjeT0iMS4yIiByPSIxLjIiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9IjAuMDM1Ii8+CiAgICA8L3BhdHRlcm4+CiAgPC9kZWZzPgoKICA8cmVjdCB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI2NzUiIGZpbGw9IiMwRDE4MTMiLz4KICA8cmVjdCB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI2NzUiIGZpbGw9InVybCgjZG90cykiLz4KICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI1IiBmaWxsPSJ1cmwoI3N0cmlwKSIvPgoKICA8IS0tIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCBleWVicm93IGNoaXA6IG9mZi1jaGFpbiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgLS0+CiAgPHJlY3QgeD0iODAiIHk9IjU4IiB3aWR0aD0iNDI4IiBoZWlnaHQ9IjM0IiByeD0iMTciIGZpbGw9IiMxMTExMTAiIHN0cm9rZT0iIzNEM0QzQSIvPgogIDxjaXJjbGUgY3g9IjEwMiIgY3k9Ijc1IiByPSI0IiBmaWxsPSIjNkYzMkZGIi8+CiAgPHRleHQgeD0iMTE4IiB5PSI4MCIgZmlsbD0iI0E0OEFGRiIgZm9udC1zaXplPSIxMy41IiBmb250LXdlaWdodD0iNTAwIiBsZXR0ZXItc3BhY2luZz0iMi41Ij5DTElFTlQtU0lERSBWQUxJREFUSU9OIMK3IE9GRi1DSEFJTjwvdGV4dD4KICA8dGV4dCB4PSI1MzAiIHk9IjgwIiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjE0Ij5jb250cmFjdHMgwrcgdHJhbnNpdGlvbnMgwrcgY29uc2lnbm1lbnRzLCBjaGVja2VkIGJ5IHRoZSBob2xkZXJzPC90ZXh0PgoKICA8IS0tIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCB1cHBlciBwbGFuZSDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgLS0+CiAgPHJlY3QgeD0iODAiIHk9IjExMiIgd2lkdGg9IjEwNDAiIGhlaWdodD0iMjEyIiByeD0iMTQiIGZpbGw9IiMxMTExMTAiIHN0cm9rZT0iIzNEM0QzQSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHJlY3QgeD0iODAiIHk9IjExMiIgd2lkdGg9IjEwNDAiIGhlaWdodD0iMjEyIiByeD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzZGMzJGRiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjE4Ii8+CgogIDwhLS0gY29uc3RlbGxhdGlvbiBlZGdlcyAtLT4KICA8ZyBzdHJva2U9IiM2RjMyRkYiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjQ1Ij4KICAgIDxsaW5lIHgxPSIxOTAiIHkxPSIyMzgiIHgyPSIzMzAiIHkyPSIxODgiLz4KICAgIDxsaW5lIHgxPSIzMzAiIHkxPSIxODgiIHgyPSI0NzAiIHkyPSIyNjIiLz4KICAgIDxsaW5lIHgxPSI0NzAiIHkxPSIyNjIiIHgyPSI2MTAiIHkyPSIyMDIiLz4KICAgIDxsaW5lIHgxPSI2MTAiIHkxPSIyMDIiIHgyPSI3NTAiIHkyPSIyNTIiLz4KICAgIDxsaW5lIHgxPSI3NTAiIHkxPSIyNTIiIHgyPSI4OTAiIHkyPSIxOTIiLz4KICAgIDxsaW5lIHgxPSI4OTAiIHkxPSIxOTIiIHgyPSIxMDEwIiB5Mj0iMjU2Ii8+CiAgICA8bGluZSB4MT0iMzMwIiB5MT0iMTg4IiB4Mj0iNjEwIiB5Mj0iMjAyIi8+CiAgICA8bGluZSB4MT0iNDcwIiB5MT0iMjYyIiB4Mj0iNzUwIiB5Mj0iMjUyIi8+CiAgPC9nPgogIDwhLS0gY29uc3RlbGxhdGlvbiBub2Rlczogcm90YXRlZCBzcXVhcmVzLCB2YXJpZWQgc2l6ZXMgLS0+CiAgPGcgZmlsbD0iIzBEMTgxMyIgc3Ryb2tlPSIjNkYzMkZGIiBzdHJva2Utd2lkdGg9IjIiPgogICAgPHJlY3QgeD0iMTc3IiB5PSIyMjUiIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMTkwIDIzOCkiLz4KICAgIDxyZWN0IHg9IjMxNCIgeT0iMTcyIiB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHRyYW5zZm9ybT0icm90YXRlKDQ1IDMzMCAxODgpIi8+CiAgICA8cmVjdCB4PSI0NTYiIHk9IjI0OCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiB0cmFuc2Zvcm09InJvdGF0ZSg0NSA0NzAgMjYyKSIvPgogICAgPHJlY3QgeD0iNzM2IiB5PSIyMzgiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgNzUwIDI1MikiLz4KICAgIDxyZWN0IHg9Ijg3NCIgeT0iMTc2IiB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHRyYW5zZm9ybT0icm90YXRlKDQ1IDg5MCAxOTIpIi8+CiAgICA8cmVjdCB4PSI5OTgiIHk9IjI0NCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB0cmFuc2Zvcm09InJvdGF0ZSg0NSAxMDEwIDI1NikiLz4KICA8L2c+CiAgPGcgZmlsbD0iIzZGMzJGRiIgb3BhY2l0eT0iMC45Ij4KICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjIzOCIgcj0iMiIvPgogICAgPGNpcmNsZSBjeD0iMzMwIiBjeT0iMTg4IiByPSIyIi8+CiAgICA8Y2lyY2xlIGN4PSI0NzAiIGN5PSIyNjIiIHI9IjIiLz4KICAgIDxjaXJjbGUgY3g9Ijc1MCIgY3k9IjI1MiIgcj0iMiIvPgogICAgPGNpcmNsZSBjeD0iODkwIiBjeT0iMTkyIiByPSIyIi8+CiAgICA8Y2lyY2xlIGN4PSIxMDEwIiBjeT0iMjU2IiByPSIyIi8+CiAgPC9nPgogIDwhLS0gdGhlIHNlYWwtYm91bmQgbm9kZSwgaGlnaGxpZ2h0ZWQgLS0+CiAgPGcgZmlsdGVyPSJ1cmwoI3NvZnQpIj4KICAgIDxyZWN0IHg9IjU4OCIgeT0iMTgwIiB3aWR0aD0iNDQiIGhlaWdodD0iNDQiIHRyYW5zZm9ybT0icm90YXRlKDQ1IDYxMCAyMDIpIiBmaWxsPSIjMEQxODEzIiBzdHJva2U9InVybCgjZ3YpIiBzdHJva2Utd2lkdGg9IjIuNSIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSI2MTAiIGN5PSIyMDIiIHI9IjMiIGZpbGw9IiMxNUU5OUEiLz4KICA8cmVjdCB4PSI1MzYiIHk9IjE0MCIgd2lkdGg9IjE0OCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMEQxODEzIiBzdHJva2U9IiMzRDNEM0EiLz4KICA8dGV4dCB4PSI2MTAiIHk9IjE1NyIgZmlsbD0iI0ZGRkZGRiIgZm9udC1zaXplPSIxMyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjUwMCI+c3RhdGUgdHJhbnNpdGlvbjwvdGV4dD4KCiAgPCEtLSDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgdGhlIHNpbmdsZSBwb2ludCBvZiBjb250YWN0IOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCAtLT4KICA8bGluZSB4MT0iNjEwIiB5MT0iMjMwIiB4Mj0iNjEwIiB5Mj0iNDYwIiBzdHJva2U9InVybCgjYmVhbSkiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHBvbHlnb24gcG9pbnRzPSI2MTAsNDcwIDYwMiw0NTUgNjE4LDQ1NSIgZmlsbD0iIzE1RTk5QSIvPgogIDwhLS0gdGljayBtYXJrcyBhbG9uZyB0aGUgYmVhbSAtLT4KICA8ZyBzdHJva2U9IiM5QTlBOTQiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiPgogICAgPGxpbmUgeDE9IjYwNCIgeTE9IjM1MiIgeDI9IjYxNiIgeTI9IjM1MiIvPgogIDwvZz4KICA8IS0tIHNlYWwgY2FsbG91dCAtLT4KICA8cmVjdCB4PSI2NTIiIHk9IjM2MiIgd2lkdGg9IjI1NiIgaGVpZ2h0PSI2MCIgcng9IjEwIiBmaWxsPSIjMTExMTEwIiBzdHJva2U9IiMzRDNEM0EiLz4KICA8cmVjdCB4PSI2NTIiIHk9IjM2MiIgd2lkdGg9IjMuNSIgaGVpZ2h0PSI2MCIgcng9IjEuNzUiIGZpbGw9InVybCgjZ3YpIi8+CiAgPGxpbmUgeDE9IjYxMCIgeTE9IjM5MiIgeDI9IjY1MiIgeTI9IjM5MiIgc3Ryb2tlPSIjM0QzRDNBIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDx0ZXh0IHg9IjY3MiIgeT0iMzg3IiBmaWxsPSIjRkZGRkZGIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj5zaW5nbGUtdXNlIHNlYWw8L3RleHQ+CiAgPHRleHQgeD0iNjcyIiB5PSI0MDgiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTMuNSI+b25lIFVUWE8sIHNwZW50IGV4YWN0bHkgb25jZTwvdGV4dD4KCiAgPCEtLSDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgbG93ZXIgcGxhbmUg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQIC0tPgogIDxyZWN0IHg9IjgwIiB5PSI0NjAiIHdpZHRoPSIxMDQwIiBoZWlnaHQ9IjExOCIgcng9IjE0IiBmaWxsPSIjMTExMTEwIiBzdHJva2U9IiMzRDNEM0EiIHN0cm9rZS13aWR0aD0iMSIvPgogIDxyZWN0IHg9IjgwIiB5PSI0NjAiIHdpZHRoPSIxMDQwIiBoZWlnaHQ9IjExOCIgcng9IjE0IiBmaWxsPSJub25lIiBzdHJva2U9IiMxNUU5OUEiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC4xOCIvPgoKICA8IS0tIGNoYWluIG9mIGJsb2NrcyAtLT4KICA8ZyBmaWxsPSIjMEQxODEzIiBzdHJva2U9IiMxNUU5OUEiIHN0cm9rZS13aWR0aD0iMiIgb3BhY2l0eT0iMC43Ij4KICAgIDxyZWN0IHg9IjEzMCIgeT0iNDg5IiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjYwIiByeD0iOCIvPgogICAgPHJlY3QgeD0iMjg2IiB5PSI0ODkiIHdpZHRoPSIxMjAiIGhlaWdodD0iNjAiIHJ4PSI4Ii8+CiAgICA8cmVjdCB4PSI0NDIiIHk9IjQ4OSIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI2MCIgcng9IjgiLz4KICAgIDxyZWN0IHg9Ijc1NCIgeT0iNDg5IiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjYwIiByeD0iOCIvPgogICAgPHJlY3QgeD0iOTEwIiB5PSI0ODkiIHdpZHRoPSIxMjAiIGhlaWdodD0iNjAiIHJ4PSI4Ii8+CiAgPC9nPgogIDwhLS0gZmFpbnQgYmxvY2sgaW5uYXJkcyAtLT4KICA8ZyBzdHJva2U9IiMxNUU5OUEiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC4yMiI+CiAgICA8bGluZSB4MT0iMTQ2IiB5MT0iNTA3IiB4Mj0iMjM0IiB5Mj0iNTA3Ii8+PGxpbmUgeDE9IjE0NiIgeTE9IjUyMSIgeDI9IjIxNCIgeTI9IjUyMSIvPjxsaW5lIHgxPSIxNDYiIHkxPSI1MzUiIHgyPSIyMjYiIHkyPSI1MzUiLz4KICAgIDxsaW5lIHgxPSIzMDIiIHkxPSI1MDciIHgyPSIzOTAiIHkyPSI1MDciLz48bGluZSB4MT0iMzAyIiB5MT0iNTIxIiB4Mj0iMzcwIiB5Mj0iNTIxIi8+PGxpbmUgeDE9IjMwMiIgeTE9IjUzNSIgeDI9IjM4MiIgeTI9IjUzNSIvPgogICAgPGxpbmUgeDE9IjQ1OCIgeTE9IjUwNyIgeDI9IjU0NiIgeTI9IjUwNyIvPjxsaW5lIHgxPSI0NTgiIHkxPSI1MjEiIHgyPSI1MjYiIHkyPSI1MjEiLz48bGluZSB4MT0iNDU4IiB5MT0iNTM1IiB4Mj0iNTM4IiB5Mj0iNTM1Ii8+CiAgICA8bGluZSB4MT0iNzcwIiB5MT0iNTA3IiB4Mj0iODU4IiB5Mj0iNTA3Ii8+PGxpbmUgeDE9Ijc3MCIgeTE9IjUyMSIgeDI9IjgzOCIgeTI9IjUyMSIvPjxsaW5lIHgxPSI3NzAiIHkxPSI1MzUiIHgyPSI4NTAiIHkyPSI1MzUiLz4KICAgIDxsaW5lIHgxPSI5MjYiIHkxPSI1MDciIHgyPSIxMDE0IiB5Mj0iNTA3Ii8+PGxpbmUgeDE9IjkyNiIgeTE9IjUyMSIgeDI9Ijk5NCIgeTI9IjUyMSIvPjxsaW5lIHgxPSI5MjYiIHkxPSI1MzUiIHgyPSIxMDA2IiB5Mj0iNTM1Ii8+CiAgPC9nPgogIDwhLS0gdGhlIGFuY2hvcmluZyBibG9jaywgaGlnaGxpZ2h0ZWQgLS0+CiAgPHJlY3QgeD0iNTk4IiB5PSI0ODkiIHdpZHRoPSIxMjAiIGhlaWdodD0iNjAiIHJ4PSI4IiBmaWxsPSIjMEQxODEzIiBzdHJva2U9InVybCgjZ3YpIiBzdHJva2Utd2lkdGg9IjIuNSIgZmlsdGVyPSJ1cmwoI3NvZnQpIi8+CiAgPHJlY3QgeD0iNjQ5IiB5PSI1MDgiIHdpZHRoPSIyMiIgaGVpZ2h0PSIyMiIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgNjYwIDUxOSkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE1RTk5QSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8dGV4dCB4PSI2NTgiIHk9IjUyNCIgZmlsbD0iIzE1RTk5QSIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InVpLW1vbm9zcGFjZSwgU0ZNb25vLVJlZ3VsYXIsIE1lbmxvLCBtb25vc3BhY2UiPjMyQjwvdGV4dD4KICA8dGV4dCB4PSI2NTgiIHk9IjU3MSIgZmlsbD0iI0ZGRkZGRiIgZm9udC1zaXplPSIxMyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjUwMCI+d2l0bmVzcyB0eCDCtyBjYXJyaWVzIHRoZSBjb21taXRtZW50PC90ZXh0PgogIDxnIHN0cm9rZT0iIzE1RTk5QSIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNTUiPgogICAgPGxpbmUgeDE9IjI1MCIgeTE9IjUxOSIgeDI9IjI4NiIgeTI9IjUxOSIvPgogICAgPGxpbmUgeDE9IjQwNiIgeTE9IjUxOSIgeDI9IjQ0MiIgeTI9IjUxOSIvPgogICAgPGxpbmUgeDE9IjU2MiIgeTE9IjUxOSIgeDI9IjU5OCIgeTI9IjUxOSIvPgogICAgPGxpbmUgeDE9IjcxOCIgeTE9IjUxOSIgeDI9Ijc1NCIgeTI9IjUxOSIvPgogICAgPGxpbmUgeDE9Ijg3NCIgeTE9IjUxOSIgeDI9IjkxMCIgeTI9IjUxOSIvPgogIDwvZz4KCiAgPCEtLSDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgZXllYnJvdyBjaGlwOiBvbi1jaGFpbiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgLS0+CiAgPHJlY3QgeD0iODAiIHk9IjYwNiIgd2lkdGg9IjMwOCIgaGVpZ2h0PSIzNCIgcng9IjE3IiBmaWxsPSIjMTExMTEwIiBzdHJva2U9IiMzRDNEM0EiLz4KICA8Y2lyY2xlIGN4PSIxMDIiIGN5PSI2MjMiIHI9IjQiIGZpbGw9IiMxNUU5OUEiLz4KICA8dGV4dCB4PSIxMTgiIHk9IjYyOCIgZmlsbD0iIzZFRURDMCIgZm9udC1zaXplPSIxMy41IiBmb250LXdlaWdodD0iNTAwIiBsZXR0ZXItc3BhY2luZz0iMi41Ij5BTkNIT1IgTEFZRVIgwrcgT04tQ0hBSU48L3RleHQ+CiAgPHRleHQgeD0iNDEwIiB5PSI2MjgiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTQiPkJpdGNvaW4sIG9yIExpcXVpZCB3aXRoIGEgMjA3LWxpbmUgcGF0Y2guIFRoZSBvbmx5IGxheWVyIHRoYXQgdG91Y2hlcyBhIHRyYW5zYWN0aW9uLjwvdGV4dD4KPC9zdmc+Cg==" />
+      <figcaption>The contract lives with its holders; the chain only ever sees one coin spent and one commitment.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot"></span> What we proved</div>
+      <h2>RGB runs natively on Liquid</h2>
+      <p>The only thing tying RGB to Bitcoin was a single transaction type in the verification code. Abstracting it took a <strong>207-line, non-breaking change</strong>. Every existing test still passes and the rest of the production RGB stack consumes it unchanged. With that in place, all of this works on a test network:</p>
+    </div>
+    <ul class="clean col fx">
+      <li><strong>Real asset transfers on Liquid</strong>, using the same tools wallets already run for Bitcoin RGB.</li>
+      <li><strong>Confidential transfers</strong>: amounts hidden by Liquid, on top of RGB's contract-level privacy.</li>
+      <li><strong>Cross-chain atomic swaps</strong> between a Bitcoin RGB asset and a Liquid one, with no custodian.</li>
+      <li><strong>Faster, cheaper settlement</strong>: one-minute blocks and low fees, still fully self-custodial.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot v"></span> Programmable seals</div>
+      <h2>What Liquid's smart contracts unlock</h2>
+      <p>Because an RGB seal is just a coin, whatever spending rules the chain can express become rules on the asset. Liquid has <strong>Simplicity</strong>, a formally verifiable contract language live on mainnet, so the chain itself can enforce how an RGB asset is allowed to move. We demonstrated the first of these; the rest are designs the same primitive makes possible.</p>
+    </div>
+    <figure class="fx">
+      <img alt="Six capabilities: chain-enforced swaps, lending on RGB collateral, trustless dollar issuance, vault custody, protected maker inventory, and privacy with programmability" src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTIwMCA2NzUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgZm9udC1mYW1pbHk9IlNhdG9zaGksIHN5c3RlbS11aSwgc2Fucy1zZXJpZiIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJTaXggY2FwYWJpbGl0aWVzIHVubG9ja2VkIGJ5IHByb2dyYW1tYWJsZSBzZWFsczogY2hhaW4tZW5mb3JjZWQgc3dhcHMsIGxlbmRpbmcgb24gUkdCIGNvbGxhdGVyYWwsIHRydXN0bGVzcyBkb2xsYXIgaXNzdWFuY2UsIHZhdWx0IGN1c3RvZHksIHByb3RlY3RlZCBtYWtlciBpbnZlbnRvcnksIGFuZCBwcml2YWN5IHdpdGggcHJvZ3JhbW1hYmlsaXR5Ij4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ3YiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMTVFOTlBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzZGMzJGRiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic3RyaXAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iMCIgeTE9IjAiIHgyPSIxMjAwIiB5Mj0iNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE1RTk5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM2RjMyRkYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8ZmlsdGVyIGlkPSJzb2Z0IiB4PSItNjAlIiB5PSItNjAlIiB3aWR0aD0iMjIwJSIgaGVpZ2h0PSIyMjAlIj4KICAgICAgPGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMy41IiByZXN1bHQ9ImIiLz4KICAgICAgPGZlTWVyZ2U+PGZlTWVyZ2VOb2RlIGluPSJiIi8+PGZlTWVyZ2VOb2RlIGluPSJTb3VyY2VHcmFwaGljIi8+PC9mZU1lcmdlPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90cyIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPGNpcmNsZSBjeD0iMS4yIiBjeT0iMS4yIiByPSIxLjIiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9IjAuMDM1Ii8+CiAgICA8L3BhdHRlcm4+CiAgPC9kZWZzPgoKICA8cmVjdCB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI2NzUiIGZpbGw9IiMwRDE4MTMiLz4KICA8cmVjdCB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI2NzUiIGZpbGw9InVybCgjZG90cykiLz4KICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI1IiBmaWxsPSJ1cmwoI3N0cmlwKSIvPgoKICA8IS0tIGV5ZWJyb3cgY2hpcCAtLT4KICA8cmVjdCB4PSI4MCIgeT0iNTYiIHdpZHRoPSIzMzAiIGhlaWdodD0iMzQiIHJ4PSIxNyIgZmlsbD0iIzExMTExMCIgc3Ryb2tlPSIjM0QzRDNBIi8+CiAgPGNpcmNsZSBjeD0iMTAyIiBjeT0iNzMiIHI9IjQiIGZpbGw9IiMxNUU5OUEiLz4KICA8dGV4dCB4PSIxMTgiIHk9Ijc4IiBmaWxsPSIjNkVFREMwIiBmb250LXNpemU9IjEzLjUiIGZvbnQtd2VpZ2h0PSI1MDAiIGxldHRlci1zcGFjaW5nPSIyLjUiPlBST0dSQU1NQUJMRSBTRUFMUzwvdGV4dD4KICA8dGV4dCB4PSI0MzIiIHk9Ijc4IiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjE0Ij53aGF0IFNpbXBsaWNpdHkgY292ZW5hbnRzIHVubG9jayBmb3IgUkdCIGFzc2V0cyBvbiBMaXF1aWQ8L3RleHQ+CgogIDwhLS0g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQIHJvdyAxIOKVkOKVkOKVkOKVkOKVkOKVkCAtLT4KICA8IS0tIGNhcmQgMTogY2hhaW4tZW5mb3JjZWQgc3dhcHMgKGRlbW9uc3RyYXRlZCkgLS0+CiAgPGcgZmlsdGVyPSJ1cmwoI3NvZnQpIj4KICAgIDxyZWN0IHg9IjgwIiB5PSIxMTgiIHdpZHRoPSIzMzAiIGhlaWdodD0iMjIyIiByeD0iMTQiIGZpbGw9IiMxMTExMTAiIHN0cm9rZT0idXJsKCNndikiIHN0cm9rZS13aWR0aD0iMiIvPgogIDwvZz4KICA8cmVjdCB4PSIxMDQiIHk9IjE0MiIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ0IiByeD0iMTAiIGZpbGw9IiMwRDE4MTMiIHN0cm9rZT0iIzE1RTk5QSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9IiMxNUU5OUEiIHN0cm9rZS13aWR0aD0iMS44Ij4KICAgIDxyZWN0IHg9IjExNSIgeT0iMTU1IiB3aWR0aD0iMTMiIGhlaWdodD0iMTMiIHRyYW5zZm9ybT0icm90YXRlKDQ1IDEyMS41IDE2MS41KSIvPgogICAgPHJlY3QgeD0iMTI0IiB5PSIxNjQiIHdpZHRoPSIxMyIgaGVpZ2h0PSIxMyIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMTMwLjUgMTcwLjUpIi8+CiAgPC9nPgogIDx0ZXh0IHg9IjEwNCIgeT0iMjE2IiBmaWxsPSIjRkZGRkZGIiBmb250LXNpemU9IjE2LjUiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSItMC4yIj5DaGFpbi1lbmZvcmNlZCBzd2FwczwvdGV4dD4KICA8dGV4dCB4PSIxMDQiIHk9IjI0MiIgZmlsbD0iIzlBOUE5NCIgZm9udC1zaXplPSIxMyI+VGhlIHNwZW5kIG11c3QgcmV2ZWFsIHRoZSBzZWNyZXQgYW5kPC90ZXh0PgogIDx0ZXh0IHg9IjEwNCIgeT0iMjYxIiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5hbmNob3IgdGhlIFJHQiB0cmFuc2Zlciwgb3IgaXQgbmV2ZXI8L3RleHQ+CiAgPHRleHQgeD0iMTA0IiB5PSIyODAiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTMiPmVudGVycyBhIGJsb2NrLjwvdGV4dD4KICA8cmVjdCB4PSIxMDQiIHk9IjI5NiIgd2lkdGg9IjEyOCIgaGVpZ2h0PSIyNCIgcng9IjEyIiBmaWxsPSIjMTVFOTlBIi8+CiAgPHRleHQgeD0iMTY4IiB5PSIzMTIiIGZpbGw9IiMwRDE4MTMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGxldHRlci1zcGFjaW5nPSIxIj5ERU1PTlNUUkFURUQ8L3RleHQ+CgogIDwhLS0gY2FyZCAyOiBsZW5kaW5nIC0tPgogIDxyZWN0IHg9IjQzNSIgeT0iMTE4IiB3aWR0aD0iMzMwIiBoZWlnaHQ9IjIyMiIgcng9IjE0IiBmaWxsPSIjMTExMTEwIiBzdHJva2U9IiMzRDNEM0EiLz4KICA8cmVjdCB4PSI0NTkiIHk9IjE0MiIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ0IiByeD0iMTAiIGZpbGw9IiMwRDE4MTMiIHN0cm9rZT0iI0E0OEFGRiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8ZyBzdHJva2U9IiNBNDhBRkYiIHN0cm9rZS13aWR0aD0iMS44IiBmaWxsPSJub25lIj4KICAgIDxsaW5lIHgxPSI0ODEiIHkxPSIxNTIiIHgyPSI0ODEiIHkyPSIxNzYiLz4KICAgIDxsaW5lIHgxPSI0NzAiIHkxPSIxNTgiIHgyPSI0OTIiIHkyPSIxNTgiLz4KICAgIDxwYXRoIGQ9Ik0gNDcwIDE1OCBMIDQ2NSAxNjggQSA2IDYgMCAwIDAgNDc1IDE2OCBaIi8+CiAgICA8cGF0aCBkPSJNIDQ5MiAxNTggTCA0ODcgMTY4IEEgNiA2IDAgMCAwIDQ5NyAxNjggWiIvPgogIDwvZz4KICA8dGV4dCB4PSI0NTkiIHk9IjIxNiIgZmlsbD0iI0ZGRkZGRiIgZm9udC1zaXplPSIxNi41IiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iLTAuMiI+TGVuZGluZyBvbiBSR0IgY29sbGF0ZXJhbDwvdGV4dD4KICA8dGV4dCB4PSI0NTkiIHk9IjI0MiIgZmlsbD0iIzlBOUE5NCIgZm9udC1zaXplPSIxMyI+TG9hbiB0ZXJtcyBiZWNvbWUgY29uc2Vuc3VzIHJ1bGVzOjwvdGV4dD4KICA8dGV4dCB4PSI0NTkiIHk9IjI2MSIgZmlsbD0iIzlBOUE5NCIgZm9udC1zaXplPSIxMyI+cmVwYXkgYW5kIHRoZSBjb2xsYXRlcmFsIHJldHVybnMsIGRlZmF1bHQ8L3RleHQ+CiAgPHRleHQgeD0iNDU5IiB5PSIyODAiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTMiPmFuZCBpdCBzZXR0bGVzLiBQb3NpdGlvbnMgc3RheSBwcml2YXRlLjwvdGV4dD4KCiAgPCEtLSBjYXJkIDM6IGRvbGxhciBpc3N1YW5jZSAtLT4KICA8cmVjdCB4PSI3OTAiIHk9IjExOCIgd2lkdGg9IjMzMCIgaGVpZ2h0PSIyMjIiIHJ4PSIxNCIgZmlsbD0iIzExMTExMCIgc3Ryb2tlPSIjM0QzRDNBIi8+CiAgPHJlY3QgeD0iODE0IiB5PSIxNDIiIHdpZHRoPSI0NCIgaGVpZ2h0PSI0NCIgcng9IjEwIiBmaWxsPSIjMEQxODEzIiBzdHJva2U9IiMxNUU5OUEiIHN0cm9rZS13aWR0aD0iMS41Ii8+CiAgPGcgc3Ryb2tlPSIjMTVFOTlBIiBzdHJva2Utd2lkdGg9IjEuOCIgZmlsbD0ibm9uZSI+CiAgICA8Y2lyY2xlIGN4PSI4MzYiIGN5PSIxNjQiIHI9IjExIi8+CiAgICA8cGF0aCBkPSJNIDgzNiAxNTcgTCA4MzYgMTcxIE0gODMxLjUgMTY4IEEgNCA0IDAgMCAwIDg0MCAxNjggQSAzLjUgMy41IDAgMCAwIDgzMiAxNjAuNSBBIDQgNCAwIDAgMSA4NDAuNSAxNjAuNSIvPgogIDwvZz4KICA8dGV4dCB4PSI4MTQiIHk9IjIxNiIgZmlsbD0iI0ZGRkZGRiIgZm9udC1zaXplPSIxNi41IiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iLTAuMiI+VHJ1c3RsZXNzIGRvbGxhciBpc3N1YW5jZTwvdGV4dD4KICA8dGV4dCB4PSI4MTQiIHk9IjI0MiIgZmlsbD0iIzlBOUE5NCIgZm9udC1zaXplPSIxMyI+UkdCIGRvbGxhcnMgbWludGVkIGFnYWluc3QgbG9ja2VkIFVTRHQuPC90ZXh0PgogIDx0ZXh0IHg9IjgxNCIgeT0iMjYxIiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5FdmVyeSBob2xkZXIgdmVyaWZpZXMgdGhlIGJhY2tpbmc7PC90ZXh0PgogIDx0ZXh0IHg9IjgxNCIgeT0iMjgwIiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5yZXNlcnZlcyBhcmUgcHVibGljIGluIHJlYWwgdGltZS48L3RleHQ+CgogIDwhLS0g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQIHJvdyAyIOKVkOKVkOKVkOKVkOKVkOKVkCAtLT4KICA8IS0tIGNhcmQgNDogdmF1bHQgY3VzdG9keSAtLT4KICA8cmVjdCB4PSI4MCIgeT0iMzY2IiB3aWR0aD0iMzMwIiBoZWlnaHQ9IjIyMiIgcng9IjE0IiBmaWxsPSIjMTExMTEwIiBzdHJva2U9IiMzRDNEM0EiLz4KICA8cmVjdCB4PSIxMDQiIHk9IjM5MCIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ0IiByeD0iMTAiIGZpbGw9IiMwRDE4MTMiIHN0cm9rZT0iI0E0OEFGRiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8cGF0aCBkPSJNIDEyNiAzOTkgTCAxMzggNDA0IEwgMTM4IDQxNCBRIDEzOCA0MjQgMTI2IDQyOSBRIDExNCA0MjQgMTE0IDQxNCBMIDExNCA0MDQgWiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQTQ4QUZGIiBzdHJva2Utd2lkdGg9IjEuOCIvPgogIDxjaXJjbGUgY3g9IjEyNiIgY3k9IjQxMyIgcj0iMi41IiBmaWxsPSIjQTQ4QUZGIi8+CiAgPHRleHQgeD0iMTA0IiB5PSI0NjQiIGZpbGw9IiNGRkZGRkYiIGZvbnQtc2l6ZT0iMTYuNSIgZm9udC13ZWlnaHQ9IjcwMCIgbGV0dGVyLXNwYWNpbmc9Ii0wLjIiPlZhdWx0IGN1c3RvZHk8L3RleHQ+CiAgPHRleHQgeD0iMTA0IiB5PSI0OTAiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTMiPkEgcmVjb3Zlcnkgd2luZG93IG9uIGV2ZXJ5IHNwZW5kIHR1cm5zPC90ZXh0PgogIDx0ZXh0IHg9IjEwNCIgeT0iNTA5IiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5rZXkgdGhlZnQgaW50byBhIHJhY2UgdGhlIGxlZ2l0aW1hdGU8L3RleHQ+CiAgPHRleHQgeD0iMTA0IiB5PSI1MjgiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTMiPm93bmVyIGNhbiB3aW4uPC90ZXh0PgoKICA8IS0tIGNhcmQgNTogbWFrZXIgaW52ZW50b3J5IC0tPgogIDxyZWN0IHg9IjQzNSIgeT0iMzY2IiB3aWR0aD0iMzMwIiBoZWlnaHQ9IjIyMiIgcng9IjE0IiBmaWxsPSIjMTExMTEwIiBzdHJva2U9IiMzRDNEM0EiLz4KICA8cmVjdCB4PSI0NTkiIHk9IjM5MCIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ0IiByeD0iMTAiIGZpbGw9IiMwRDE4MTMiIHN0cm9rZT0iIzE1RTk5QSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8ZyBzdHJva2U9IiMxNUU5OUEiIHN0cm9rZS13aWR0aD0iMS44IiBmaWxsPSJub25lIj4KICAgIDxyZWN0IHg9IjQ3MCIgeT0iNDA2IiB3aWR0aD0iMjIiIGhlaWdodD0iMTYiIHJ4PSIzIi8+CiAgICA8cGF0aCBkPSJNIDQ3NSA0MDYgTCA0NzUgNDAxIEEgNiA2IDAgMCAxIDQ4NyA0MDEgTCA0ODcgNDA2Ii8+CiAgPC9nPgogIDx0ZXh0IHg9IjQ1OSIgeT0iNDY0IiBmaWxsPSIjRkZGRkZGIiBmb250LXNpemU9IjE2LjUiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSItMC4yIj5Qcm90ZWN0ZWQgbWFrZXIgaW52ZW50b3J5PC90ZXh0PgogIDx0ZXh0IHg9IjQ1OSIgeT0iNDkwIiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5Ib3Qgd2FsbGV0cyB0aGF0IGNhbiBvbmx5IHNwZW5kIGludG88L3RleHQ+CiAgPHRleHQgeD0iNDU5IiB5PSI1MDkiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTMiPnN3YXAtc2hhcGVkIG91dHB1dHMuIFN0b2xlbiBrZXlzPC90ZXh0PgogIDx0ZXh0IHg9IjQ1OSIgeT0iNTI4IiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5jYW5ub3QgZHJhaW4gdGhlIGZsb2F0LjwvdGV4dD4KCiAgPCEtLSBjYXJkIDY6IHByaXZhY3kgLS0+CiAgPHJlY3QgeD0iNzkwIiB5PSIzNjYiIHdpZHRoPSIzMzAiIGhlaWdodD0iMjIyIiByeD0iMTQiIGZpbGw9IiMxMTExMTAiIHN0cm9rZT0iIzNEM0QzQSIvPgogIDxyZWN0IHg9IjgxNCIgeT0iMzkwIiB3aWR0aD0iNDQiIGhlaWdodD0iNDQiIHJ4PSIxMCIgZmlsbD0iIzBEMTgxMyIgc3Ryb2tlPSIjQTQ4QUZGIiBzdHJva2Utd2lkdGg9IjEuNSIvPgogIDxnIHN0cm9rZT0iI0E0OEFGRiIgc3Ryb2tlLXdpZHRoPSIxLjgiIGZpbGw9Im5vbmUiPgogICAgPHBhdGggZD0iTSA4MjQgNDEyIFEgODM2IDQwMCA4NDggNDEyIFEgODM2IDQyNCA4MjQgNDEyIFoiLz4KICAgIDxjaXJjbGUgY3g9IjgzNiIgY3k9IjQxMiIgcj0iMy41Ii8+CiAgICA8bGluZSB4MT0iODI2IiB5MT0iNDI0IiB4Mj0iODQ2IiB5Mj0iNDAwIi8+CiAgPC9nPgogIDx0ZXh0IHg9IjgxNCIgeT0iNDY0IiBmaWxsPSIjRkZGRkZGIiBmb250LXNpemU9IjE2LjUiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSItMC4yIj5Qcml2YWN5IHdpdGggcHJvZ3JhbW1hYmlsaXR5PC90ZXh0PgogIDx0ZXh0IHg9IjgxNCIgeT0iNDkwIiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5Db3ZlbmFudCBydWxlcyBvbiB0aGUgY29udGFpbmVyIHdoaWxlPC90ZXh0PgogIDx0ZXh0IHg9IjgxNCIgeT0iNTA5IiBmaWxsPSIjOUE5QTk0IiBmb250LXNpemU9IjEzIj5hbW91bnRzIGFuZCBoaXN0b3J5IHN0YXkgb2ZmLWNoYWluLjwvdGV4dD4KICA8dGV4dCB4PSI4MTQiIHk9IjUyOCIgZmlsbD0iIzlBOUE5NCIgZm9udC1zaXplPSIxMyI+Tm8gdHJhZGVvZmYgdG8gbWFrZS48L3RleHQ+CgogIDwhLS0gZm9vdGVyIGxpbmUgLS0+CiAgPHRleHQgeD0iNjAwIiB5PSI2MzQiIGZpbGw9IiM5QTlBOTQiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlRoZSBjaGFpbiBlbmZvcmNlcyB0aGUgY29udGFpbmVyLiA8dHNwYW4gZmlsbD0iI0ZGRkZGRiIgZm9udC13ZWlnaHQ9IjUwMCI+Q2xpZW50LXNpZGUgdmFsaWRhdGlvbiBlbmZvcmNlcyB0aGUgY29udGVudHMuPC90c3Bhbj48L3RleHQ+Cjwvc3ZnPgo=" />
+    </figure>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot"></span> A dollar on Liquid</div>
+      <h2>Minting LR-USDT, backed and auditable</h2>
+      <p>One concrete use: a dollar on RGB rails, minted only against real backing. Every holder can verify that backing straight from the transaction, with no oracle, no attestation. We built the minting side two ways, and both run today:</p>
+      <div class="compare">
+        <div class="approach">
+          <h3>Lock <span class="tag ok">demonstrated</span></h3>
+          <p>Mint by locking native USDt into a vault. The backing is held and redeemable in principle; reserves are the sum of the vault, public in real time.</p>
+        </div>
+        <div class="approach">
+          <h3>Burn <span class="tag ok">demonstrated</span></h3>
+          <p>Mint by destroying the USDt instead of holding it. No vault, no key that can ever move it, so proof-of-reserves becomes proof-of-burn. The trade: a burn returns nothing, so it's a one-way migration.</p>
+        </div>
+      </div>
+      <p style="margin-top:16px; font-size:14.5px; color:var(--muted);">Minting can even be made <strong>permissionless</strong>: a Simplicity covenant lets anyone mint, but only in a transaction that locks the backing and anchors the transfer. We proved that too, including the chain rejecting malformed mints. And the backing terms can live <strong>inside the contract itself</strong>: we built a schema that commits the vault, the asset, and the rate into the token's genesis, so anyone can audit the entire mint history against the chain. An over-mint the chain happily confirmed was caught by that audit, with no oracle anywhere.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot v"></span> Positions with rules</div>
+      <h2>Staking, and where it gets hard</h2>
+      <p>The same idea, applied to a locked position. A <strong>time-locked staking covenant</strong> holds a staked asset until a maturity height and binds it to return to the staker. We built it: the chain refuses to unstake early, refuses to send the principal anywhere but back to the staker, and refuses a spend that skips the RGB anchor. Keyless, and enforced by consensus, not by us.</p>
+      <div class="compare">
+        <div class="approach">
+          <h3>Time-locked staking <span class="tag ok">demonstrated</span></h3>
+          <p>Lock now, unstake only after maturity, principal always returns home. The reward for staking is issuance layered on top, the same machinery as minting.</p>
+        </div>
+        <div class="approach">
+          <h3>On-chain AMM <span class="tag trust">research</span></h3>
+          <p>A swap pool is shared, constantly-updated state, which fights RGB's model where each holder validates their own history. It needs a data-availability layer and succinct validity proofs to scale. That is why KaleidoSwap uses a market-maker model instead: continuous liquidity, no shared pool to coordinate.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot v"></span> The hard question</div>
+      <h2>Can a token move to Liquid and back?</h2>
+      <p>Not by moving the <em>same</em> token, that isn't how RGB works. A token is tied to the chain it was issued on, and a coin can only be spent on the one chain it lives on, so there is no native "teleport." You get the same outcome two ways, with different trust:</p>
+      <div class="compare">
+        <div class="approach">
+          <h3>Atomic swap <span class="tag ok">demonstrated, round trip</span></h3>
+          <p>Swap your Bitcoin token for its Liquid twin, and swap back later. Either the trade completes fully or nothing happens, and no custodian. We ran the full round trip: a Bitcoin RGB token and a Liquid RGB token crossed owners and came back, both supplies conserved, every hop verified. This is the approach we ship.</p>
+        </div>
+        <div class="approach">
+          <h3>Lock-and-mint <span class="tag trust">needs trust</span></h3>
+          <p>Lock the token on Bitcoin, mint a backed version on Liquid, reverse to return. Gives one canonical token across chains, but the Bitcoin side can't be covenant-enforced today, so it relies on a federation. A bridge with a trust assumption.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col fx">
+      <div class="eyebrow"><span class="dot"></span> Quick answers</div>
+      <h2>Questions people ask</h2>
+      <div class="qa">
+        <details open>
+          <summary>Is running RGB on Liquid actually possible?</summary>
+          <div class="ans"><p>Yes. It's a working proof of concept, open source, run on a test network. The change needed upstream is small and non-breaking, and has been submitted to the RGB maintainers.</p></div>
+        </details>
+        <details>
+          <summary>Can I take my RGB token from Bitcoin to Liquid and back?</summary>
+          <div class="ans"><p>Yes, in effect, via a trustless atomic swap (swap it for the Liquid twin and back, no custodian, needs a liquidity provider). A one-to-one canonical bridge is also possible but currently trusts a federation.</p></div>
+        </details>
+        <details>
+          <summary>Does a token need two mints to exist on both chains?</summary>
+          <div class="ans"><p>With the swap model, yes: two separate tokens, each issued once on its own chain, kept 1:1 by swaps. With the bridge model, no: the token is minted once, and the Liquid version is only minted on demand against the originals you lock, then burned when you come back.</p></div>
+        </details>
+        <details>
+          <summary>Is my money ever held by someone else?</summary>
+          <div class="ans"><p>With atomic swaps, never: the trade is all-or-nothing by construction. With the lock-and-mint bridge, the locked funds sit under a federation, which is the trust you accept for a canonical cross-chain token.</p></div>
+        </details>
+        <details>
+          <summary>Can you do staking or a swap pool (AMM) on this?</summary>
+          <div class="ans"><p>Staking, yes, and it is built: a covenant locks the position until maturity and only ever returns it to the staker, all enforced by the chain. An automated market maker is much harder, because a swap pool is shared live state and RGB keeps state with each holder. It is a research problem that really wants succinct validity proofs. In the meantime a market-maker model gives the same continuous liquidity without a shared pool to coordinate.</p></div>
+        </details>
+        <details>
+          <summary>Is this live for users?</summary>
+          <div class="ans"><p>Not yet. This is engineering R&amp;D on test networks. Liquid and RGB on mainnet are already in the KaleidoSwap browser extension (closed beta); RGB-on-Liquid is a candidate to become one of the trading venues our maker network supports.</p></div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="links">
+      <a href="https://github.com/kaleidoswap/rgb-on-liquid-spike">The code &amp; proof of concept</a>
+      <a href="https://github.com/kaleidoswap/rgb-on-liquid-spike/blob/main/RFC.md">The upstream RFC</a>
+      <a href="https://kaleidoswap.com">KaleidoSwap</a>
+    </div>
+    <div class="note">This is a KaleidoSwap engineering proof of concept, run on Bitcoin and Liquid test networks. It is not a product, and nothing here is financial advice.</div>
+  </footer>
+
+</main>
+<script>
+(function () {
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- scroll reveals ---- */
+  var fx = [].slice.call(document.querySelectorAll('.fx'));
+  if (reduced || !('IntersectionObserver' in window)) {
+    fx.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    fx.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---- generated hero: the kaleidoscope, animated ---- */
+  var cv = document.getElementById('kal');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var W = 1200, H = 630, CX = W / 2, CY = H / 2;
+  var GREEN = '#15E99A', VIOLET = '#8B5CF6', VIOLET2 = '#6F32FF', SOFT = '#6EEDC0';
+
+  function dpr() { return Math.min(window.devicePixelRatio || 1, 2); }
+  function fit() {
+    var r = dpr();
+    cv.width = W * r; cv.height = H * r;
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+  }
+  fit(); window.addEventListener('resize', fit);
+
+  // static geometry: two chains of diamonds marching to the center
+  var chain = [
+    { x: 165, s: 45, o: 0.30 }, { x: 280, s: 50, o: 0.50 },
+    { x: 407, s: 55, o: 0.70 }, { x: 544, s: 60, o: 0.95 }
+  ];
+  var stars = [];
+  for (var i = 0; i < 26; i++) {
+    stars.push({ x: Math.random() * W, y: Math.random() * H, r: 0.6 + Math.random() * 1.1, p: Math.random() * Math.PI * 2 });
+  }
+
+  function diamond(x, y, s, stroke, alpha, fill) {
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+  }
+  function grad(x0, y0, x1, y1) {
+    var g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, GREEN); g.addColorStop(1, VIOLET2);
+    return g;
+  }
+
+  function frame(t) {
+    var T = t / 1000;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0D1813'; ctx.fillRect(0, 0, W, H);
+
+    // faint 135° guides
+    ctx.save(); ctx.globalAlpha = 0.05; ctx.lineWidth = 1;
+    for (var g1 = 0; g1 < 3; g1++) {
+      ctx.strokeStyle = g1 % 2 ? VIOLET2 : GREEN;
+      ctx.beginPath(); ctx.moveTo(-100 + g1 * 260, -100); ctx.lineTo(700 + g1 * 260, 700); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(W + 100 - g1 * 260, -100); ctx.lineTo(W - 700 - g1 * 260, 700); ctx.stroke();
+    }
+    ctx.restore();
+
+    // stars twinkle
+    stars.forEach(function (st) {
+      var a = 0.10 + 0.20 * (0.5 + 0.5 * Math.sin(T * 0.8 + st.p));
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    });
+
+    // ghost diamonds
+    diamond(CX, CY, 260, GREEN, 0.08);
+    diamond(CX, CY, 205, VIOLET2, 0.08);
+
+    // chains + connecting links
+    ctx.save(); ctx.lineWidth = 1.5;
+    for (var k = 0; k < chain.length - 1; k++) {
+      var a1 = chain[k], b1 = chain[k + 1];
+      ctx.globalAlpha = 0.45;
+      ctx.strokeStyle = GREEN;
+      ctx.beginPath(); ctx.moveTo(a1.x + a1.s, CY); ctx.lineTo(b1.x - b1.s, CY); ctx.stroke();
+      ctx.strokeStyle = VIOLET;
+      ctx.beginPath(); ctx.moveTo(W - a1.x - a1.s, CY); ctx.lineTo(W - b1.x + b1.s, CY); ctx.stroke();
+    }
+    ctx.restore();
+
+    chain.forEach(function (d, idx) {
+      var breathe = 0.06 * Math.sin(T * 1.4 - idx * 0.7);
+      diamond(d.x, CY, d.s, GREEN, Math.min(1, d.o + breathe), 'rgba(21,233,154,0.05)');
+      diamond(W - d.x, CY, d.s, VIOLET, Math.min(1, d.o + breathe), 'rgba(111,50,255,0.06)');
+    });
+
+    // pulses: commitments flowing from both edges into the center
+    var period = 3.4;
+    [0, 1].forEach(function (side) {
+      var ph = ((T + side * period / 2) % period) / period;   // 0..1
+      var x0 = 120, x1 = CX - 95;
+      var px = x0 + (x1 - x0) * ph;
+      var col = side === 0 ? GREEN : VIOLET;
+      var x = side === 0 ? px : W - px;
+      ctx.save();
+      ctx.globalAlpha = 0.85 * Math.sin(Math.PI * ph);
+      ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(x, CY, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    });
+
+    // center facet: gradient diamond + rotating inner facet + breathing core
+    var glow = 0.5 + 0.5 * Math.sin(T * 1.1);
+    ctx.save();
+    ctx.shadowColor = 'rgba(21,233,154,' + (0.35 + 0.25 * glow) + ')';
+    ctx.shadowBlur = 22 + 10 * glow;
+    ctx.strokeStyle = grad(CX - 95, CY - 95, CX + 95, CY + 95);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY - 95); ctx.lineTo(CX + 95, CY); ctx.lineTo(CX, CY + 95); ctx.lineTo(CX - 95, CY);
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+
+    // inner cross
+    ctx.save(); ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = SOFT;
+    ctx.beginPath(); ctx.moveTo(CX, CY - 95); ctx.lineTo(CX, CY + 95); ctx.stroke();
+    ctx.strokeStyle = grad(CX - 95, CY, CX + 95, CY);
+    ctx.beginPath(); ctx.moveTo(CX - 95, CY); ctx.lineTo(CX + 95, CY); ctx.stroke();
+    ctx.restore();
+
+    // rotating inner diamond
+    var rot = reduced ? 0 : T * 0.35;
+    ctx.save(); ctx.translate(CX, CY); ctx.rotate(rot);
+    ctx.globalAlpha = 0.85; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = grad(-43, -43, 43, 43);
+    ctx.beginPath(); ctx.moveTo(0, -43); ctx.lineTo(43, 0); ctx.lineTo(0, 43); ctx.lineTo(-43, 0);
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+
+    // core
+    ctx.save();
+    ctx.fillStyle = grad(CX - 8, CY - 8, CX + 8, CY + 8);
+    ctx.shadowColor = GREEN; ctx.shadowBlur = 10 + 8 * glow;
+    ctx.beginPath(); ctx.arc(CX, CY, 6.5 + glow, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(CX, CY, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // top/bottom shards
+    [[0, VIOLET2], [1, GREEN]].forEach(function (sh) {
+      var dir = sh[0] === 0 ? -1 : 1;
+      ctx.save(); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.strokeStyle = sh[1];
+      ctx.fillStyle = sh[0] === 0 ? 'rgba(111,50,255,0.10)' : 'rgba(21,233,154,0.10)';
+      ctx.beginPath();
+      ctx.moveTo(CX, CY + dir * 187); ctx.lineTo(CX + 42, CY + dir * 125); ctx.lineTo(CX - 42, CY + dir * 125);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  if (reduced) { frame(1600); return; }   // one static, composed frame
+
+  var running = true, raf;
+  function loop(t) { if (running) { frame(t); raf = requestAnimationFrame(loop); } }
+  raf = requestAnimationFrame(loop);
+
+  // pause offscreen and when the tab is hidden
+  new IntersectionObserver(function (entries) {
+    var vis = entries[0].isIntersecting;
+    if (vis && !running) { running = true; raf = requestAnimationFrame(loop); }
+    if (!vis) { running = false; cancelAnimationFrame(raf); }
+  }, { threshold: 0.05 }).observe(cv);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { running = false; cancelAnimationFrame(raf); }
+    else if (!running) { running = true; raf = requestAnimationFrame(loop); }
+  });
+})();
+</script>
+
+</body>
+</html>
