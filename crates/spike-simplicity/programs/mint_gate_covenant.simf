@@ -1,0 +1,61 @@
+/*
+ * MINT-GATE COVENANT — permissionless, rule-bound minting.
+ *
+ * This program locks the *gate seal* of an IFA (multi-mint) RGB
+ * contract: the UTXO carrying the contract's inflation allowance.
+ * Anyone may spend it (there is no key and no signature), but only
+ * with a transaction shaped like a valid backed mint:
+ *
+ *   output 0  MUST be an RGB `opret` anchor:
+ *             OP_RETURN OP_PUSHBYTES_32 <32-byte MPC root>.
+ *             The root itself is free (chosen at mint time); the
+ *             SHAPE is enforced.
+ *
+ *   output 1  MUST lock exactly TRANCHE units of BACKING_ASSET into
+ *             the vault script (VAULT_SPK_HASH). Asset and amount
+ *             must be explicit: a peg vault is publicly auditable
+ *             by design.
+ *
+ *   output 3  MUST pay this very covenant again (recursion), so the
+ *             remaining inflation allowance lands on a gate seal
+ *             with the same rules for the next minter.
+ *
+ * Output 2 (the recipient's new seal) is unconstrained: which seal
+ * receives the minted units is RGB's business, not the chain's.
+ *
+ * Division of labour: the chain enforces the container (backing in,
+ * anchor present, gate re-created); RGB's client-side validation
+ * enforces the contents (mint amount <= allowance, mint amount <=
+ * locked tranche via the backed-mint verifier). Neither can do the
+ * other's job, and together they leave no one to trust in the mint
+ * path.
+ */
+
+fn main() {
+    // 1) Output 0 is an RGB opret anchor: OP_RETURN || PUSH32 || root.
+    let prefix: u16 = 0x6a20;
+    let hasher: Ctx8 = jet::sha_256_ctx_8_init();
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_2(hasher, prefix);
+    let hasher: Ctx8 = jet::sha_256_ctx_8_add_32(hasher, witness::ANCHOR_PAYLOAD);
+    let anchor_spk_hash: u256 = jet::sha_256_ctx_8_finalize(hasher);
+    assert!(jet::eq_256(unwrap(jet::output_script_hash(0)), anchor_spk_hash));
+
+    // 2) Output 1 locks the backing into the vault: right script,
+    //    right asset, exact tranche, everything explicit.
+    assert!(jet::eq_256(unwrap(jet::output_script_hash(1)), param::VAULT_SPK_HASH));
+    let (asset, amount): (Asset1, Amount1) = unwrap(jet::output_amount(1));
+    match asset {
+        Left(_: (u1, u256)) => panic!(), // blinded asset: not auditable
+        Right(id: u256) => assert!(jet::eq_256(id, param::BACKING_ASSET)),
+    };
+    match amount {
+        Left(_: (u1, u256)) => panic!(), // blinded amount: not auditable
+        Right(value: u64) => assert!(jet::eq_64(value, param::TRANCHE)),
+    };
+
+    // 3) Output 3 re-creates this covenant for the next minter.
+    assert!(jet::eq_256(
+        unwrap(jet::output_script_hash(3)),
+        jet::current_script_hash(),
+    ));
+}

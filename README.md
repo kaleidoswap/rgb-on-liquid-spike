@@ -38,6 +38,14 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
   `preimage(H) ∧ valid_rgb_anchor` construction, in running code. A spend
   stripped of its anchor output is rejected by the chain itself, not by
   tooling.
+- A **Simplicity mint-gate covenant**: permissionless backed minting. The
+  gate seal carrying an IFA contract's inflation allowance is locked under a
+  covenant, so anyone may mint, but only in a transaction that anchors the
+  RGB transition, locks the exact backing tranche to the vault (asset +
+  amount introspection jets), and re-creates the gate under the same
+  covenant for the next minter (recursion). Two chained mints settle; spends
+  that drop the anchor, short the backing, or skip the gate re-creation are
+  rejected by consensus (`demo_mint_gate.sh`).
 - The patch itself: `rgb-consensus` 0.11.1-rc.10 plus a `WitnessTx` trait,
   vendored under `vendor/rgb-consensus-patched/`. The upstream test suite
   passes unchanged (45/45), and `rgb-ops`, `rgb-schemas`, `rgb-invoicing`, and
@@ -56,7 +64,7 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
 │   ├── spike-env/              minimal JSON-RPC client for elementsd / bitcoind
 │   ├── spike-tapret/           BIP-341 tweak math + P2TR address encoding
 │   ├── spike-rgb-anchor/       MPC tree, tapret commit/verify, RGB20, swap + HTLC
-│   └── spike-simplicity/       SimplicityHL covenant + taproot(0xbe) driver
+│   └── spike-simplicity/       SimplicityHL covenants (anchor gate, mint gate) + driver
 └── vendor/
     └── rgb-consensus-patched/  rgb-consensus 0.11.1-rc.10 + the WitnessTx patch
 ```
@@ -81,6 +89,7 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/demo_htlc_rgb.sh      # RGB-wrapped HTLC claim (seal = HTLC UTXO)
 ./scripts/demo_backed_mint.sh   # IFA mint backed by a locked Elements asset
 ./scripts/demo_simplicity.sh    # Simplicity covenant: preimage ∧ anchor-shaped output
+./scripts/demo_mint_gate.sh     # Simplicity mint-gate: permissionless backed minting
 
 ./scripts/teardown.sh           # stop the nodes and wipe state
 ```

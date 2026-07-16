@@ -47,9 +47,13 @@ impl ElementsRpc {
         }
     }
 
+    /// Defaults, overridable via `ELEMENTSD_RPC_URL` (e.g. to point the
+    /// verifiers at the Simplicity-enabled node on port 7042).
     pub fn from_defaults() -> Self {
         use crate::defaults::*;
-        Self::new(ELEMENTSD_RPC_URL, ELEMENTSD_RPC_USER, ELEMENTSD_RPC_PASS)
+        let url =
+            std::env::var("ELEMENTSD_RPC_URL").unwrap_or_else(|_| ELEMENTSD_RPC_URL.to_owned());
+        Self::new(url, ELEMENTSD_RPC_USER, ELEMENTSD_RPC_PASS)
     }
 
     /// JSON-RPC client pointed at Bitcoin Core regtest. The wire

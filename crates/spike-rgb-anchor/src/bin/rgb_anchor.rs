@@ -186,6 +186,18 @@ enum Cmd {
         /// (required unless the mint exhausts it).
         #[arg(long)]
         new_gate_seal: Option<String>,
+        /// For chained mints: the genesis gate seal that defines the
+        /// contract, when `--gate-seal` is a later gate being spent.
+        #[arg(long)]
+        orig_gate_seal: Option<String>,
+        /// For chained mints: OpId (hex) of the transition whose
+        /// allowance is consumed. Default: the contract genesis.
+        #[arg(long)]
+        consume_opid: Option<String>,
+        /// For chained mints: the allowance carried by the consumed
+        /// assignment. Default: `--max-supply` (a first mint).
+        #[arg(long)]
+        allowance: Option<u64>,
         /// X-only internal key (32 bytes hex).
         #[arg(
             long,
@@ -405,6 +417,9 @@ async fn main() -> Result<()> {
             gate_seal,
             recipient_seal,
             new_gate_seal,
+            orig_gate_seal,
+            consume_opid,
+            allowance,
             internal_key,
             entropy,
             chain_net,
@@ -416,6 +431,9 @@ async fn main() -> Result<()> {
             &gate_seal,
             &recipient_seal,
             new_gate_seal.as_deref(),
+            orig_gate_seal.as_deref(),
+            consume_opid.as_deref(),
+            allowance,
             &internal_key,
             entropy,
             &chain_net,
@@ -995,6 +1013,9 @@ fn ifa_mint(
     gate_seal_s: &str,
     recipient_seal_s: &str,
     new_gate_seal_s: Option<&str>,
+    orig_gate_seal_s: Option<&str>,
+    consume_opid_s: Option<&str>,
+    allowance: Option<u64>,
     internal_key_hex: &str,
     entropy: u64,
     chain_net_s: &str,
@@ -1017,20 +1038,31 @@ fn ifa_mint(
     eprintln!(" IFA backed mint — chain_net = {chain_net}");
     eprintln!("──────────────────────────────────────────────────────────");
 
-    // Step 1: issue the IFA with the whole supply as inflation
-    // allowance on the gate seal. Nothing circulates yet.
-    let issuance = mint::issue_ifa(chain_net, name, ticker, max_supply, gate_seal)?;
+    // Step 1: (re-)derive the IFA. The contract is defined by the
+    // genesis gate seal; for a first mint that is `--gate-seal`
+    // itself, for chained mints it is `--orig-gate-seal`.
+    let issuance_seal = orig_gate_seal_s
+        .map(parse_outpoint)
+        .transpose()?
+        .unwrap_or(gate_seal);
+    let issuance = mint::issue_ifa(chain_net, name, ticker, max_supply, issuance_seal)?;
     eprintln!(" contract    : {}", issuance.contract_id);
     eprintln!(" gate seal   : {}:{}", gate_seal.txid, gate_seal.vout);
     eprintln!(" max supply  : {max_supply} {ticker} (0 issued at genesis)");
 
-    // Step 2: the mint transition consuming the gate allowance.
-    let genesis_opid = rgbcore::OpId::from(issuance.contract_id.to_byte_array());
+    // Step 2: the mint transition consuming the gate allowance. A
+    // first mint consumes the genesis assignment; a chained mint
+    // consumes the allowance re-assigned by the previous transition.
+    let consume_opid = match consume_opid_s {
+        Some(s) => rgbcore::OpId::from(parse32(s, "consume_opid")?),
+        None => rgbcore::OpId::from(issuance.contract_id.to_byte_array()),
+    };
+    let allowance_before = allowance.unwrap_or(max_supply);
     let (bundle_id, transition) = mint::build_mint(
         issuance.contract_id,
-        genesis_opid,
+        consume_opid,
         0,
-        max_supply,
+        allowance_before,
         mint_amount,
         recipient_seal,
         new_gate_seal,
@@ -1043,7 +1075,7 @@ fn ifa_mint(
     if let Some(g) = new_gate_seal {
         eprintln!(
             " allowance   : {} {} rolls to gate seal {}:{}",
-            max_supply - mint_amount,
+            allowance_before - mint_amount,
             ticker,
             g.txid,
             g.vout
@@ -1099,6 +1131,9 @@ fn ifa_mint(
 
     println!("{addr}");
     println!("{}", serde_json::to_string(&anchor)?);
+    // Third stdout line: this transition's OpId, so a chained mint can
+    // consume the allowance it re-assigned (`--consume-opid`).
+    println!("{}", hex::encode(transition.commit_id().to_byte_array()));
     Ok(())
 }
 
