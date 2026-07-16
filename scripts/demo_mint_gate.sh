@@ -89,7 +89,8 @@ KEY_ADDR=$(echo "$KEY" | jq -r '.address')
 # `jet::output_asset` returns the asset id in internal (consensus) byte
 # order, which is the reverse of the display hex `issueasset` prints, so
 # the covenant param must be byte-reversed.
-BACKING_LE=$(printf '%s' "$BACKING" | fold -w2 | tail -r | tr -d '\n')
+# byte-reverse the display hex (portable: `tail -r` is BSD-only)
+BACKING_LE=$(python3 -c "s='$BACKING'; print(''.join(s[i:i+2] for i in range(len(s)-2,-1,-2)))")
 ARGS="$OUT_DIR/mint_gate_args.json"
 jq -n --arg v "0x$VAULT_HASH" --arg a "0x$BACKING_LE" --arg t "$TRANCHE" \
   '{VAULT_SPK_HASH:{value:$v,type:"u256"},BACKING_ASSET:{value:$a,type:"u256"},TRANCHE:{value:($t),type:"u64"}}' \

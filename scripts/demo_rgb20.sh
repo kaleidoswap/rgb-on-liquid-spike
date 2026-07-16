@@ -33,9 +33,12 @@ echo "════════════════════════�
 # pin the future outpoint by predicting the witness txid is fresh).
 echo
 echo "== Pick Alice's seal =="
-ALICE_UTXOS=$(ecli_w w_a listunspent 1)
-ALICE_SEAL_TXID=$(echo "$ALICE_UTXOS" | jq -r '.[0].txid')
-ALICE_SEAL_VOUT=$(echo "$ALICE_UTXOS" | jq -r '.[0].vout')
+# Prefer an explicit v0-segwit L-BTC UTXO as the seal (see demo_seal).
+ALICE_SEAL=$(ecli_w w_a listunspent 1 | jq -r '([.[] | select(.asset=="b2e15d0d7a0c94e4e2ce0fe6e8691b9e451377f6e46e8045a86f7c4b5d4f0f23"
+  and (.amountblinder == "0000000000000000000000000000000000000000000000000000000000000000")
+  and (.address | startswith("ert1q")))] + .)[0]' )
+ALICE_SEAL_TXID=$(echo "$ALICE_SEAL" | jq -r '.txid')
+ALICE_SEAL_VOUT=$(echo "$ALICE_SEAL" | jq -r '.vout')
 echo "  alice seal : $ALICE_SEAL_TXID:$ALICE_SEAL_VOUT"
 
 # Bob's seal is a future outpoint — vout 1 of the witness tx we're

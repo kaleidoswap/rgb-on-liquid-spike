@@ -26,11 +26,15 @@ echo "════════════════════════�
 # 1. Pick a spendable L-BTC UTXO on w_a; we'll designate this the seal.
 echo
 echo "== Picking a seal UTXO from w_a =="
-UTXOS=$(ecli_w w_a listunspent 1)
-SEAL_TXID=$(echo "$UTXOS" | jq -r '.[0].txid')
-SEAL_VOUT=$(echo "$UTXOS" | jq -r '.[0].vout')
-SEAL_AMOUNT=$(echo "$UTXOS" | jq -r '.[0].amount')
-SEAL_SPK=$(echo "$UTXOS" | jq -r '.[0].scriptPubKey')
+# Prefer an explicit v0-segwit L-BTC UTXO as the seal (raw signing of
+# taproot/blinded inputs flakes on Elements); fall back to any UTXO.
+SEAL=$(ecli_w w_a listunspent 1 | jq -r '([.[] | select(.asset=="b2e15d0d7a0c94e4e2ce0fe6e8691b9e451377f6e46e8045a86f7c4b5d4f0f23"
+  and (.amountblinder == "0000000000000000000000000000000000000000000000000000000000000000")
+  and (.address | startswith("ert1q")))] + .)[0]' )
+SEAL_TXID=$(echo "$SEAL" | jq -r '.txid')
+SEAL_VOUT=$(echo "$SEAL" | jq -r '.vout')
+SEAL_AMOUNT=$(echo "$SEAL" | jq -r '.amount')
+SEAL_SPK=$(echo "$SEAL" | jq -r '.scriptPubKey')
 echo "  seal: $SEAL_TXID:$SEAL_VOUT  amount=$SEAL_AMOUNT  spk=${SEAL_SPK:0:16}..."
 
 # 2. Build the anchor (carries the seal outpoint in its JSON).

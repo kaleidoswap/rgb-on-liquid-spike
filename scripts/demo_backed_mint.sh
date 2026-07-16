@@ -77,17 +77,17 @@ FUND_OUTS="${FUND_OUTS%,}]"
 FUND_TXID=$(ecli_w w_a sendmany "" "$(echo "$FUND_OUTS" | jq 'map(to_entries[0] | select(.key != "asset") | {(.key): .value}) | add')" 2>/dev/null) \
   || FUND_TXID=""
 if [ -z "$FUND_TXID" ]; then
-  # sendmany JSON gymnastics differ across versions; do three sends.
+  # sendmany JSON gymnastics differ across versions; do three sends,
+  # locking each gate UTXO immediately so wallet coin selection cannot
+  # spend gate N while funding gate N+1.
   for i in 0 1 2; do
     T=$(ecli_w w_a sendtoaddress "${GATE_ADDR[$i]}" 0.01)
-    GATE_UTXO[$i]="$T"
+    V=$(ecli getrawtransaction "$T" 1 \
+      | jq --arg a "${GATE_ADDR[$i]}" '.vout[] | select(.scriptPubKey.address == $a) | .n')
+    GATE_UTXO[$i]="$T:$V"
+    ecli_w w_a lockunspent false "[{\"txid\":\"$T\",\"vout\":$V}]" > /dev/null
   done
   ecli generatetoaddress 1 "$MINE" > /dev/null
-  for i in 0 1 2; do
-    V=$(ecli getrawtransaction "${GATE_UTXO[$i]}" 1 \
-      | jq --arg a "${GATE_ADDR[$i]}" '.vout[] | select(.scriptPubKey.address == $a) | .n')
-    GATE_UTXO[$i]="${GATE_UTXO[$i]}:$V"
-  done
 else
   ecli generatetoaddress 1 "$MINE" > /dev/null
   for i in 0 1 2; do

@@ -39,3 +39,31 @@ jobs:
 
       - name: cargo test
         run: cargo test --workspace
+
+  # The demos are the evidence: anchors verified on-chain, covenants
+  # enforced by consensus, negatives rejected. Run them all against
+  # fresh nodes so the proofs cannot silently regress.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Run every demo end-to-end
+        run: ./scripts/demo_all.sh
+
+      - name: Teardown
+        if: always()
+        run: ./scripts/teardown.sh

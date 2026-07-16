@@ -65,18 +65,19 @@ echo "  vault: $VAULT_ADDR"
 echo "  terms: committed in genesis, rate 1/1"
 
 # ── gate seals: G0 (genesis), G1, G2, G3 (one per mint's next gate) ──
+# Gate UTXOs are ordinary wallet coins, so lock each one the moment it
+# is created: otherwise the wallet's coin selection may spend gate N
+# while funding gate N+1 (it did, on a lean wallet).
 declare -a GATE_ADDR GATE_UTXO
 for i in 0 1 2 3; do
   GATE_ADDR[$i]=$(ecli_w w_a getaddressinfo "$(ecli_w w_a getnewaddress)" | jq -r '.unconfidential')
   T=$(ecli_w w_a sendtoaddress "${GATE_ADDR[$i]}" 0.01)
-  GATE_UTXO[$i]="$T"
+  V=$(ecli getrawtransaction "$T" 1 \
+    | jq --arg a "${GATE_ADDR[$i]}" '.vout[] | select(.scriptPubKey.address == $a) | .n')
+  GATE_UTXO[$i]="$T:$V"
+  ecli_w w_a lockunspent false "[{\"txid\":\"$T\",\"vout\":$V}]" > /dev/null
 done
 ecli generatetoaddress 1 "$MINE" > /dev/null
-for i in 0 1 2 3; do
-  V=$(ecli getrawtransaction "${GATE_UTXO[$i]}" 1 \
-    | jq --arg a "${GATE_ADDR[$i]}" '.vout[] | select(.scriptPubKey.address == $a) | .n')
-  GATE_UTXO[$i]="${GATE_UTXO[$i]}:$V"
-done
 
 # run_bfa_mint <n> <mint_amount> <lock_coins> <gate> <new_gate> \
 #              <consume_opid|-> <allowance|->
@@ -138,7 +139,8 @@ run_bfa_mint() {
        {"fee":  ($fee|tonumber),   "asset": $lb} ]')
   raw=$(ecli createrawtransaction "$inputs" "$outputs")
   signed=$(ecli_w w_a signrawtransactionwithwallet "$raw" | jq -r '.hex')
-  txid=$(ecli sendrawtransaction "$signed")
+  # errexit does not propagate into $(...) — fail loudly instead.
+  txid=$(ecli sendrawtransaction "$signed") || { echo "✗ mint #$n broadcast failed" >&2; exit 1; }
   ecli generatetoaddress 2 "$MINE" > /dev/null
   echo "$txid $opid"
 }

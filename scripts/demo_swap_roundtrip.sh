@@ -44,14 +44,17 @@ echo "════════════════════════�
 MINE_L=$(ecli_w w_a getaddressinfo "$(ecli_w w_a getnewaddress)" | jq -r '.unconfidential')
 MINE_B=$(bcli_w w_btc getnewaddress)
 
+# Seal UTXOs are ordinary wallet coins; lock each one on creation so
+# later wallet funding cannot cannibalize it.
 fund_btc() {  # <address|-> prints "txid:vout spk" for a fresh 0.001 BTC UTXO
   local addr spk txid vout
   addr=$(bcli_w w_btc getnewaddress)
   spk=$(bcli getaddressinfo "$addr" 2>/dev/null | jq -r '.scriptPubKey') \
     || spk=$(bcli_w w_btc getaddressinfo "$addr" | jq -r '.scriptPubKey')
   txid=$(bcli_w w_btc sendtoaddress "$addr" 0.001)
-  bcli_w w_btc generatetoaddress 1 "$MINE_B" > /dev/null
   vout=$(bcli getrawtransaction "$txid" 1 | jq --arg s "$spk" '.vout[] | select(.scriptPubKey.hex == $s) | .n')
+  bcli_w w_btc lockunspent false "[{\"txid\":\"$txid\",\"vout\":$vout}]" > /dev/null
+  bcli_w w_btc generatetoaddress 1 "$MINE_B" > /dev/null
   echo "$txid:$vout $spk"
 }
 
@@ -60,8 +63,9 @@ fund_liq() {  # <wallet> prints "txid:vout spk"
   addr=$(ecli_w "$w" getaddressinfo "$(ecli_w "$w" getnewaddress)" | jq -r '.unconfidential')
   spk=$(ecli_w "$w" getaddressinfo "$addr" | jq -r '.scriptPubKey')
   txid=$(ecli_w "$w" sendtoaddress "$addr" 0.001)
-  ecli generatetoaddress 1 "$MINE_L" > /dev/null
   vout=$(ecli getrawtransaction "$txid" 1 | jq --arg s "$spk" '.vout[] | select(.scriptPubKey.hex == $s) | .n')
+  ecli_w "$w" lockunspent false "[{\"txid\":\"$txid\",\"vout\":$vout}]" > /dev/null
+  ecli generatetoaddress 1 "$MINE_L" > /dev/null
   echo "$txid:$vout $spk"
 }
 

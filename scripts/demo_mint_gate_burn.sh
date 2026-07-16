@@ -75,7 +75,8 @@ KEY_SPK=$(echo "$KEY" | jq -r '.spk_hex')
 
 # covenant args (no vault): backing asset byte-reversed to internal
 # order (as jet::output_asset returns it), and the exact tranche.
-BACKING_LE=$(printf '%s' "$BACKING" | fold -w2 | tail -r | tr -d '\n')
+# byte-reverse the display hex (portable: `tail -r` is BSD-only)
+BACKING_LE=$(python3 -c "s='$BACKING'; print(''.join(s[i:i+2] for i in range(len(s)-2,-1,-2)))")
 ARGS="$OUT_DIR/mint_gate_burn_args.json"
 jq -n --arg a "0x$BACKING_LE" --arg t "$TRANCHE" \
   '{BACKING_ASSET:{value:$a,type:"u256"},TRANCHE:{value:($t),type:"u64"}}' > "$ARGS"
