@@ -12,6 +12,7 @@
 pub mod anchor;
 pub mod bundle;
 pub mod liquid_dbc;
+pub mod mint;
 pub mod mpc;
 pub mod patched_anchor;
 pub mod rgb20;

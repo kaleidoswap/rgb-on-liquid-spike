@@ -27,6 +27,11 @@ The proposed upstream change is written up in [RFC.md](RFC.md).
 - An **RGB-wrapped HTLC claim**: the HTLC UTXO *is* the RGB seal, so one
   transaction reveals the swap preimage, closes the seal, and carries the
   tapret anchor that re-seats the asset on the claimer's own output.
+- **Backed minting**: a real IFA (multi-mint) contract whose supply starts
+  as an inflation allowance on a gate seal. Each mint's witness transaction
+  must lock a native Elements asset into a vault, one unit per minted unit,
+  and every holder verifies that backing straight from the witness tx.
+  Unbacked and under-backed mints are rejected (`demo_backed_mint.sh`).
 - A **Simplicity covenant** on Liquid regtest (Elements 23.3, tapleaf 0xbe):
   a seal UTXO that consensus only lets you spend by revealing a preimage
   AND carrying an RGB-`opret`-shaped commitment output at vout 0 — the
@@ -74,6 +79,7 @@ docker compose up -d            # start elementsd + bitcoind regtest
 ./scripts/demo_swap.sh          # cross-chain Bitcoin <-> Liquid atomic swap
 ./scripts/demo_htlc.sh          # full HTLC (claim + CSV refund) on both chains
 ./scripts/demo_htlc_rgb.sh      # RGB-wrapped HTLC claim (seal = HTLC UTXO)
+./scripts/demo_backed_mint.sh   # IFA mint backed by a locked Elements asset
 ./scripts/demo_simplicity.sh    # Simplicity covenant: preimage ∧ anchor-shaped output
 
 ./scripts/teardown.sh           # stop the nodes and wipe state

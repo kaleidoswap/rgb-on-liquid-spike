@@ -162,6 +162,59 @@ enum Cmd {
         preimage: String,
     },
 
+    /// Issue an IFA (inflatable) contract and build a backed mint:
+    /// a TS_INFLATION transition consuming the gate seal's allowance.
+    /// The witness tx is expected to lock the backing asset; check it
+    /// afterwards with `verify-backed-mint`.
+    IfaMint {
+        #[arg(long, default_value = "LiquidRgbUSD")]
+        name: String,
+        #[arg(long, default_value = "LRUSD")]
+        ticker: String,
+        #[arg(long, default_value_t = 1_000_000)]
+        max_supply: u64,
+        /// Units minted by this transition (consumes that much allowance).
+        #[arg(long, default_value_t = 250_000)]
+        mint: u64,
+        /// `<txid>:<vout>` — UTXO holding the inflation allowance.
+        #[arg(long)]
+        gate_seal: String,
+        /// `<txid>:<vout>` — seal receiving the minted units.
+        #[arg(long)]
+        recipient_seal: String,
+        /// `<txid>:<vout>` — seal receiving the remaining allowance
+        /// (required unless the mint exhausts it).
+        #[arg(long)]
+        new_gate_seal: Option<String>,
+        /// X-only internal key (32 bytes hex).
+        #[arg(
+            long,
+            default_value = "d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d"
+        )]
+        internal_key: String,
+        #[arg(long, default_value_t = 0xC0FFEE_u64)]
+        entropy: u64,
+        #[arg(long, default_value = "liquid-testnet")]
+        chain_net: String,
+    },
+
+    /// Verify a backed mint: the standard anchor + seal checks, plus
+    /// the backing rule: the witness tx must lock >= `required` units
+    /// of `backing_asset` into the `vault_spk` output.
+    VerifyBackedMint {
+        #[arg(long)]
+        anchor: std::path::PathBuf,
+        /// Vault scriptPubKey hex the backing must be locked to.
+        #[arg(long)]
+        vault_spk: String,
+        /// Backing Elements asset id (display hex).
+        #[arg(long)]
+        backing_asset: String,
+        /// Minimum backing amount, in explicit units (asset satoshis).
+        #[arg(long)]
+        required: u64,
+    },
+
     /// Derive a full-HTLC P2WSH address (claim branch = preimage +
     /// claimer key; refund branch = CSV delay + refund key). Demo keys
     /// are derived from labels: sk = SHA256(label).
@@ -344,6 +397,35 @@ async fn main() -> Result<()> {
             &lbtc_asset,
             &preimage,
         ),
+        Cmd::IfaMint {
+            name,
+            ticker,
+            max_supply,
+            mint,
+            gate_seal,
+            recipient_seal,
+            new_gate_seal,
+            internal_key,
+            entropy,
+            chain_net,
+        } => ifa_mint(
+            &name,
+            &ticker,
+            max_supply,
+            mint,
+            &gate_seal,
+            &recipient_seal,
+            new_gate_seal.as_deref(),
+            &internal_key,
+            entropy,
+            &chain_net,
+        ),
+        Cmd::VerifyBackedMint {
+            anchor,
+            vault_spk,
+            backing_asset,
+            required,
+        } => verify_backed_mint(&anchor, &vault_spk, &backing_asset, required).await,
         Cmd::HtlcAddress {
             hash,
             claimer,
@@ -901,6 +983,161 @@ fn build(
 
     println!("{addr}");
     println!("{}", serde_json::to_string(&anchor)?);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ifa_mint(
+    name: &str,
+    ticker: &str,
+    max_supply: u64,
+    mint_amount: u64,
+    gate_seal_s: &str,
+    recipient_seal_s: &str,
+    new_gate_seal_s: Option<&str>,
+    internal_key_hex: &str,
+    entropy: u64,
+    chain_net_s: &str,
+) -> Result<()> {
+    use spike_rgb_anchor::mint;
+
+    let p = parse32(internal_key_hex, "internal_key")?;
+    let gate_seal = parse_outpoint(gate_seal_s)?;
+    let recipient_seal = parse_outpoint(recipient_seal_s)?;
+    let new_gate_seal = new_gate_seal_s.map(parse_outpoint).transpose()?;
+    let chain_net = parse_chain_net(chain_net_s)?;
+    let hrp = match chain_net {
+        ChainNet::BitcoinRegtest => "bcrt",
+        ChainNet::LiquidTestnet => "ert",
+        ChainNet::LiquidMainnet => "ex",
+        other => anyhow::bail!("unsupported chain_net for ifa-mint: {other}"),
+    };
+
+    eprintln!("──────────────────────────────────────────────────────────");
+    eprintln!(" IFA backed mint — chain_net = {chain_net}");
+    eprintln!("──────────────────────────────────────────────────────────");
+
+    // Step 1: issue the IFA with the whole supply as inflation
+    // allowance on the gate seal. Nothing circulates yet.
+    let issuance = mint::issue_ifa(chain_net, name, ticker, max_supply, gate_seal)?;
+    eprintln!(" contract    : {}", issuance.contract_id);
+    eprintln!(" gate seal   : {}:{}", gate_seal.txid, gate_seal.vout);
+    eprintln!(" max supply  : {max_supply} {ticker} (0 issued at genesis)");
+
+    // Step 2: the mint transition consuming the gate allowance.
+    let genesis_opid = rgbcore::OpId::from(issuance.contract_id.to_byte_array());
+    let (bundle_id, transition) = mint::build_mint(
+        issuance.contract_id,
+        genesis_opid,
+        0,
+        max_supply,
+        mint_amount,
+        recipient_seal,
+        new_gate_seal,
+    )?;
+    eprintln!(" bundle_id   : {}", hex::encode(bundle_id.to_byte_array()));
+    eprintln!(
+        " minting     : {} {} to seal {}:{}",
+        mint_amount, ticker, recipient_seal.txid, recipient_seal.vout
+    );
+    if let Some(g) = new_gate_seal {
+        eprintln!(
+            " allowance   : {} {} rolls to gate seal {}:{}",
+            max_supply - mint_amount,
+            ticker,
+            g.txid,
+            g.vout
+        );
+    }
+    eprintln!(
+        " transition  : {} (TS_INFLATION, validated by IFA's AluVM)",
+        hex::encode(transition.commit_id().to_byte_array()),
+    );
+
+    // Step 3: MPC + tapret, same pipeline as every other anchor here.
+    let pid = issuance.contract_id.to_byte_array();
+    let msg = bundle_id.to_byte_array();
+    let entries = vec![mpc::Entry {
+        protocol_id: pid,
+        message: msg,
+    }];
+    let (root, _tree) = mpc::build(&entries, entropy)?;
+    let committed = liquid_dbc::commit(p, root)?;
+    let spk_bytes = hex::decode(&committed.committed_spk_hex)?;
+    if !spk_bytes.starts_with(&[0x51, 0x20]) {
+        anyhow::bail!(
+            "expected P2TR scriptPubKey, got {}",
+            committed.committed_spk_hex
+        );
+    }
+    let mut q = [0u8; 32];
+    q.copy_from_slice(&spk_bytes[2..34]);
+    let addr = spike_tapret::address::encode_p2tr(hrp, &q)?;
+
+    eprintln!(" MPC root    : {}", hex::encode(root));
+    eprintln!(" SPK         : {}", committed.committed_spk_hex);
+    eprintln!(" P2TR addr   : {addr}");
+    eprintln!("──────────────────────────────────────────────────────────");
+
+    let anchor = LiquidAnchor {
+        txid: String::new(),
+        internal_key_hex: hex::encode(p),
+        mpc_root_hex: hex::encode(root),
+        entries: vec![AnchorEntry {
+            protocol_id_hex: hex::encode(pid),
+            message_hex: hex::encode(msg),
+            label: format!("ifa-mint:{ticker}"),
+        }],
+        layer1: format!("{}", chain_net.layer1()),
+        chain_net: format!("{chain_net}"),
+        static_entropy: entropy,
+        seal: Some(LiquidSeal {
+            txid: format!("{}", gate_seal.txid),
+            vout: gate_seal.vout,
+        }),
+    };
+
+    println!("{addr}");
+    println!("{}", serde_json::to_string(&anchor)?);
+    Ok(())
+}
+
+/// The full backed-mint verification a receiver runs: the standard
+/// anchor + seal-closure checks, then the backing rule against the
+/// same witness transaction.
+async fn verify_backed_mint(
+    anchor_path: &std::path::Path,
+    vault_spk_hex: &str,
+    backing_asset_s: &str,
+    required: u64,
+) -> Result<()> {
+    use spike_rgb_anchor::mint;
+
+    // 1. Anchor, MPC inclusion, and seal closure: identical to `verify`.
+    verify(anchor_path).await?;
+
+    // 2. The backing rule, read off the same witness transaction.
+    let s = std::fs::read_to_string(anchor_path).context("reading anchor")?;
+    let anchor: LiquidAnchor = serde_json::from_str(&s).context("parsing anchor")?;
+    let vault_spk = hex::decode(vault_spk_hex).context("vault_spk hex")?;
+    let backing_asset: elements::AssetId = backing_asset_s.parse().context("backing asset id")?;
+
+    let rpc = spike_env::elements_rpc::ElementsRpc::from_defaults();
+    let raw = rpc
+        .call("getrawtransaction", serde_json::json!([anchor.txid]))
+        .await?;
+    let raw_hex = raw
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("getrawtransaction returned non-string"))?;
+    let witness_tx: elements::Transaction =
+        elements::encode::deserialize(&hex::decode(raw_hex).context("witness tx hex")?)
+            .map_err(|e| anyhow::anyhow!("deserialize witness tx: {e}"))?;
+
+    let locked = mint::verify_backing(&witness_tx, &vault_spk, &backing_asset, required)?;
+    println!(
+        "✓ backing verified: {locked} units of {} locked to the vault (required {required})",
+        &backing_asset_s[..16.min(backing_asset_s.len())]
+    );
     Ok(())
 }
 
