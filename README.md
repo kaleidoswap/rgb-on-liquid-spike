@@ -2,6 +2,8 @@
 
 Proof of concept: RGB assets running natively on the Liquid sidechain.
 
+**Plain-language explainer:** <https://kaleidoswap.github.io/rgb-on-liquid-spike/>
+
 RGB is client-side-validated smart contracts for Bitcoin. Its anchor layer —
 the part that binds asset transfers to real on-chain transactions — is typed
 against `bitcoin::Transaction`, and that is the only thing that stops RGB from
