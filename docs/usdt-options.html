@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USDT on RGB via Liquid: the design space &mdash; KaleidoSwap R&amp;D</title>
+<meta name="description" content="Every way to bridge L-USDt to a USDT asset on Bitcoin RGB — issuer vaults, covenant mints, the SPV peg-in mint — with dependencies, risks, and a verdict.">
+<meta property="og:title" content="USDT on RGB via Liquid: the design space">
+<meta property="og:description" content="Eight constructions compared: who mints, who enforces the backing, and which one needs no trusted minter at all.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127753;</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  img, svg { max-width: 100%; }
+</style>
+</head>
+<body>
+<style>
+  :root {
+    --bg: #0D1813; --bg2: #0a120e; --card: #101a14; --card2: #0e1712;
+    --border: rgba(255,255,255,0.09); --text: #ECEFEA; --muted: #97A29A;
+    --green: #15E99A; --green-soft: #6EEDC0; --violet: #8b63ff; --violet-soft: #A48AFF;
+    --warn: #f0b429; --bad: #ef6a6a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f5f8f6; --bg2:#eef3f0; --card:#ffffff; --card2:#f7faf8;
+      --border: rgba(10,30,20,0.12); --text:#12241b; --muted:#5b6b62;
+      --green:#0b9e68; --green-soft:#0b7e55; --violet:#6a3fe0; --violet-soft:#5a35c2;
+      --warn:#a97b0a; --bad:#c0392b; }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0D1813; --bg2:#0a120e; --card:#101a14; --card2:#0e1712;
+    --border: rgba(255,255,255,0.09); --text:#ECEFEA; --muted:#97A29A;
+    --green:#15E99A; --green-soft:#6EEDC0; --violet:#8b63ff; --violet-soft:#A48AFF;
+    --warn:#f0b429; --bad:#ef6a6a; }
+  :root[data-theme="light"] {
+    --bg:#f5f8f6; --bg2:#eef3f0; --card:#ffffff; --card2:#f7faf8;
+    --border: rgba(10,30,20,0.12); --text:#12241b; --muted:#5b6b62;
+    --green:#0b9e68; --green-soft:#0b7e55; --violet:#6a3fe0; --violet-soft:#5a35c2;
+    --warn:#a97b0a; --bad:#c0392b; }
+
+  body { background: linear-gradient(160deg, var(--bg) 55%, var(--bg2)); color: var(--text);
+    font: 16px/1.65 -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 22px 80px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--green); display:flex; align-items:center; gap:8px; }
+  .eyebrow .dot { width:7px; height:7px; border-radius:50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .eyebrow .dot.v { background: var(--violet); box-shadow: 0 0 10px var(--violet); }
+  h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.12; letter-spacing: -0.02em;
+    margin: 14px 0 10px; text-wrap: balance; }
+  h1 .grad { background: linear-gradient(135deg, var(--green), var(--violet-soft));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { color: var(--muted); font-size: 17px; max-width: 66ch; }
+  h2 { font-size: 24px; letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance; }
+  section { margin-top: 52px; }
+  .secline { height:1px; background: linear-gradient(90deg, var(--green), var(--violet), transparent);
+    opacity:.35; margin: 10px 0 22px; }
+
+  .grid { display: grid; gap: 14px; }
+  @media (min-width: 760px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+
+  .opt { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 20px 16px; position: relative; overflow: hidden; }
+  .opt::before { content:""; position:absolute; inset:0 auto 0 0; width:3px;
+    background: var(--accent, var(--muted)); opacity:.8; }
+  .opt h3 { margin: 0 0 2px; font-size: 18px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .opt h3 .letter { font-family: var(--mono); color: var(--accent, var(--muted)); }
+  .opt .sub { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .tag { font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 999px;
+    letter-spacing: .06em; white-space: nowrap; }
+  .tag.ok    { color: var(--green); background: color-mix(in srgb, var(--green) 13%, transparent); border:1px solid color-mix(in srgb, var(--green) 40%, transparent); }
+  .tag.wait  { color: var(--violet-soft); background: color-mix(in srgb, var(--violet) 13%, transparent); border:1px solid color-mix(in srgb, var(--violet) 40%, transparent); }
+  .tag.trust { color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+  .tag.out   { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); border:1px solid color-mix(in srgb, var(--bad) 38%, transparent); }
+
+  .pc { display:grid; gap: 4px 18px; font-size: 14px; }
+  @media (min-width: 560px) { .pc { grid-template-columns: 1fr 1fr; } }
+  .pc ul { margin: 6px 0 6px; padding-left: 0; list-style: none; }
+  .pc li { padding-left: 20px; position: relative; margin: 5px 0; color: var(--text); }
+  .pc .pro li::before { content:"+"; position:absolute; left:2px; color: var(--green); font-family: var(--mono); font-weight:700; }
+  .pc .con li::before { content:"–"; position:absolute; left:2px; color: var(--bad); font-family: var(--mono); font-weight:700; }
+  .pc .lbl { font-family: var(--mono); font-size: 11px; letter-spacing:.12em; text-transform: uppercase; color: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  .tblwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+  th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); background: var(--card2); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.y { color: var(--green); font-weight: 600; }
+  td.n { color: var(--bad); }
+  td.m { color: var(--warn); }
+  tr.win td { background: color-mix(in srgb, var(--green) 6%, transparent); }
+  td .mono { font-family: var(--mono); }
+
+  .verdict { border: 1px solid color-mix(in srgb, var(--green) 45%, transparent);
+    background: linear-gradient(150deg, color-mix(in srgb, var(--green) 8%, var(--card)), var(--card));
+    border-radius: 16px; padding: 26px 24px; }
+  .flow { display: grid; gap: 10px; margin: 18px 0 6px; }
+  @media (min-width: 760px) { .flow { grid-template-columns: repeat(3, 1fr); } }
+  .step { background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .step .n { font-family: var(--mono); color: var(--violet-soft); font-size: 12px; letter-spacing:.1em; }
+  .step h4 { margin: 4px 0 4px; font-size: 15px; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+  .seq { display:flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; font-family: var(--mono); font-size: 13px; }
+  .seq .s { padding: 7px 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); }
+  .seq .s.hot { border-color: color-mix(in srgb, var(--green) 50%, transparent); color: var(--green); }
+  .seq .arrow { color: var(--muted); }
+
+  .foot { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13.5px; }
+  .foot a { color: var(--green-soft); text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+  p code, li code { font-family: var(--mono); font-size: .88em; background: color-mix(in srgb, var(--violet) 12%, transparent);
+    padding: 1px 6px; border-radius: 6px; }
+  .note { font-size: 13.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><span class="dot"></span> KaleidoSwap &middot; USDT on RGB &middot; Decision Brief</div>
+    <h1>Bridging <span class="grad">L-USDt</span> to <span class="grad">RGB on Bitcoin</span>: every option, one verdict</h1>
+    <p class="lede">There is no USDT on RGB today. The only Tether near Bitcoin is L-USDt, a native Liquid asset — so any USDT on RGB must be <em>created</em> from it. Each option below is a different answer to one question: <strong>who mints, and who enforces the backing?</strong> All of them share the same irreducible base trust: Tether's solvency and the Liquid federation.</p>
+  </header>
+
+  <section>
+    <h2>The options</h2>
+    <div class="secline"></div>
+    <div class="grid two">
+
+      <div class="opt" style="--accent: var(--green);">
+        <h3><span class="letter">P</span> SPV peg-in mint <span class="tag ok">audit-grade now &middot; the pick</span></h3>
+        <p class="sub">Liquid's peg-in pattern, ported to RGB. Anyone locks L-USDt in a claim-tagged deposit on Liquid and self-mints on Bitcoin RGB with the SPV proof; every holder's validation enforces the rules forever.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>No trusted minter; inflation impossible by rule</li>
+            <li>Right chain: dollars reach Bitcoin + Lightning RGB</li>
+            <li>Deposits theft-proof (tag) and double-claim-proof (gate serialization)</li>
+            <li>Refund covenant: censorship never traps funds</li>
+            <li>Buildable now from proven spike pieces</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>Delay-only coordinator on the Bitcoin gate (v1)</li>
+            <li>Peg-out gated, not trustless (same as Liquid's own peg)</li>
+            <li>Audit-grade until the AluVM introspection RFC lands</li>
+            <li>Heavier validation; no light-client story yet</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--warn);">
+        <h3><span class="letter">A</span> Issuer vault <span class="tag trust">ships now &middot; trusted</span></h3>
+        <p class="sub">KaleidoSwap mints on Bitcoin RGB against a published L-USDt vault on Liquid; anyone audits <code>vault &ge; supply</code> with no oracle. Same topology as P — only who may mint differs.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>Shippable immediately; engineering is weeks</li>
+            <li>Best-in-class transparency for a wrapped asset</li>
+            <li>Feeds the maker; showcases stable LN channels</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>Trusted minter: fraud window, custody blast radius</li>
+            <li>Issuer-of-record regulation (MiCA EMT) — the long pole</li>
+            <li>Dead vault capital; stablecoin cold start</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--violet);">
+        <h3><span class="letter">B</span> Covenant mint on Liquid <span class="tag wait">needs RFC #12</span></h3>
+        <p class="sub">The RGB asset lives on Liquid; one transaction mints and locks backing, and a Simplicity covenant makes the chain reject unbacked mints. Proven end to end in the spike.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>Chain-enforced backing; permissionless minting</li>
+            <li>Programmable dollars (gates, staking, vaults)</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>Inflation gap: chain can't read RGB amounts (audit-killed only)</li>
+            <li>Wrong chain: competes with L-USDt itself, misses Lightning</li>
+            <li>Immutable covenant = unpatchable if buggy</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--violet);">
+        <h3><span class="letter">B&#8314;</span> B + AluVM introspection <span class="tag wait">two RFCs away</span></h3>
+        <p class="sub">Validators read the witness transaction: an unbacked mint becomes invalid for everyone; tranche-bound redemption yields a two-sided arbitrage peg. The endgame for programmable dollars on Liquid.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>No minter, no inflation, mechanically defended peg</li>
+            <li>Doubly enforced: covenant + client-side validation</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>RFC #12 <em>and</em> a second consensus change — years, not ours to control</li>
+            <li>Still Liquid-hosted; formal verification mandatory</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--green);">
+        <h3><span class="letter">C</span> No wrap — swaps at the edge <span class="tag ok">live today</span></h3>
+        <p class="sub">Hold native L-USDt; atomic-swap at the boundary whenever value enters RGB or Lightning rails. This is the existing maker model — and the safety net under every other option.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>Zero new trust, zero issuance risk, already works</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>No dollars <em>inside</em> RGB/LN — no stable channels</li>
+            <li>Spread on every crossing; needs maker liquidity</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--muted);">
+        <h3><span class="letter">D</span> Tether issues natively <span class="tag wait">their call</span></h3>
+        <p class="sub">Canonical USDT on RGB from the issuer itself. Not a plan — an exit condition: every wrap above is designed to retire gracefully into it via 1:1 maker swaps.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>No wrapper trust at all; unlimited size</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>External timing; they may pick other rails or none</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--warn);">
+        <h3><span class="letter">E</span> Federated issuer <span class="tag trust">still trusted</span></h3>
+        <p class="sub">Option A with an N-of-M consortium holding the vault and co-signing mints. A maturation knob for A as float grows — not a distinct launch path.</p>
+        <div class="pc">
+          <div class="pro"><span class="lbl">Pro</span><ul>
+            <li>No single-key custody failure</li>
+          </ul></div>
+          <div class="con"><span class="lbl">Con</span><ul>
+            <li>Still a trusted minter, plus governance and quorum liveness</li>
+          </ul></div>
+        </div>
+      </div>
+
+      <div class="opt" style="--accent: var(--bad);">
+        <h3><span class="letter">F</span> Synthetic dollar <span class="tag out">excluded</span></h3>
+        <p class="sub">No Tether: USD exposure manufactured from BTC via perp hedging or DLCs. Different product, soft peg at the tails, hedge-venue or oracle trust. Out by decision.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Side by side</h2>
+    <div class="secline"></div>
+    <div class="tblwrap"><table>
+      <thead><tr>
+        <th>Option</th><th>Minter trust</th><th>Inflation risk</th><th>Peg defense</th><th>Ships</th><th>Depends on</th>
+      </tr></thead>
+      <tbody>
+        <tr class="win">
+          <td><span class="mono">P</span> SPV peg-in mint</td>
+          <td class="y">none</td><td class="y">none</td>
+          <td>mint-arb caps top; gated redeemers hold floor</td>
+          <td class="y">audit-grade now</td>
+          <td>tag spec + SPV in wallets; AluVM RFC for full grade</td>
+        </tr>
+        <tr>
+          <td><span class="mono">C</span> Swaps only</td>
+          <td class="y">none (nothing minted)</td><td class="y">none</td>
+          <td>Tether's own</td><td class="y">live</td><td>nothing — current maker model</td>
+        </tr>
+        <tr>
+          <td><span class="mono">A</span> Issuer vault</td>
+          <td class="n">yes (us)</td><td class="m">fraud window, fast detection</td>
+          <td>issuer-dependent</td><td class="y">now</td><td>vault ops + desk + <strong>legal</strong></td>
+        </tr>
+        <tr>
+          <td><span class="mono">B</span> Covenant on Liquid</td>
+          <td class="y">none</td><td class="m">gap until AluVM RFC</td>
+          <td>weak redemption leg</td><td class="m">after RFC #12</td><td>RFC #12 + wallets</td>
+        </tr>
+        <tr>
+          <td><span class="mono">B&#8314;</span> + introspection</td>
+          <td class="y">none</td><td class="y">none</td>
+          <td>two-sided arbitrage</td><td class="m">years</td><td>RFC #12 + AluVM RFC + wallets</td>
+        </tr>
+        <tr>
+          <td><span class="mono">D</span> Tether native</td>
+          <td class="y">Tether only</td><td class="y">—</td><td>canonical</td><td class="m">unknown</td><td>Tether's decision</td>
+        </tr>
+        <tr>
+          <td><span class="mono">E</span> Federated A</td>
+          <td class="n">yes (committee)</td><td class="m">reduced</td><td>as A</td><td class="m">slow</td><td>A first + governance</td>
+        </tr>
+        <tr>
+          <td><span class="mono">F</span> Synthetic</td>
+          <td class="y">none</td><td class="y">n/a</td><td class="n">soft (funding/basis)</td><td class="n">excluded</td><td>hedge venue / oracle</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <p class="note" style="margin-top:10px;">Filter applied: no trusted minter, no inflation channel, no synthetic. Only <strong>P</strong> creates USDT on RGB and passes; <strong>C</strong> passes by creating nothing.</p>
+  </section>
+
+  <section>
+    <div class="verdict">
+      <div class="eyebrow"><span class="dot v"></span> Verdict</div>
+      <h2>P — the SPV peg-in mint</h2>
+      <p>Port Liquid's peg-in to RGB: the depositor <em>is</em> the minter, and every holder's own validation — not any issuer — enforces that no mint is unbacked, stolen, or double-claimed. Dollars land on the chain where the demand actually is: Bitcoin and Lightning RGB rails.</p>
+      <div class="flow">
+        <div class="step"><span class="n">1 &middot; LOCK</span><h4>Tagged deposit on Liquid</h4><p>L-USDt into a covenant tranche (your key, ~72h refund branch) + an OP_RETURN committing to your RGB claim. The tag welds the deposit to you alone.</p></div>
+        <div class="step"><span class="n">2 &middot; MINT</span><h4>Self-mint on Bitcoin RGB</h4><p>A mint transition carrying the claim package: deposit tx, Merkle path, federation-signed headers, the tag's opening. ~4&nbsp;KB, off-chain, verified in milliseconds.</p></div>
+        <div class="step"><span class="n">3 &middot; VALIDATE</span><h4>Everyone, forever</h4><p>Nine rules per mint: real deposit, right vault and asset, amount &ge; minted, tag opens to this seal, never claimed before, supply arithmetic. Fail one &rarr; invalid for every honest wallet.</p></div>
+      </div>
+      <p><strong>Trust, stated precisely:</strong> Tether + Liquid federation (unavoidable for any USDT), a <em>delay-only</em> coordinator on the Bitcoin gate whose censorship is capped by the refund covenant, and — until the AluVM introspection RFC upgrades the rules from wallet-policy to validation itself — conforming wallets. Exits: maker atomic swaps for everyone, instantly; gated wholesale peg-out for size, exactly like Liquid's own peg.</p>
+      <div class="seq">
+        <span class="s hot">C &middot; live now</span><span class="arrow">&rarr;</span>
+        <span class="s hot">P &middot; audit-grade bridge</span><span class="arrow">&rarr;</span>
+        <span class="s">AluVM RFC &middot; validation-grade</span><span class="arrow">&rarr;</span>
+        <span class="s">B&#8314; &middot; programmable dollars</span><span class="arrow">&rarr;</span>
+        <span class="s">D &middot; Tether arrives, wrap retires 1:1</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Status</h2>
+    <div class="secline"></div>
+    <p class="note">The evidence base is built and CI-enforced: RGB anchors on Liquid, four Simplicity covenants, the backing-aware BFA schema with full-history audit (a chain-confirmed over-mint caught, a falsified history rejected), and round-trip atomic swaps between Bitcoin and Liquid RGB assets. P's design is complete (schema, tag format, nine validation rules, refund covenant, threat model, four-phase build plan) — each phase ~80% assembled from proven pieces. Upstream, the maintainers responded favorably to our multi-chain RFC and asked us to wait for their consensus refactor before submitting the patch.</p>
+  </section>
+
+  <div class="foot">
+    KaleidoSwap R&amp;D &middot;
+    <a href="https://github.com/kaleidoswap/rgb-on-liquid-spike">spike repo</a> &middot;
+    <a href="https://kaleidoswap.github.io/rgb-on-liquid-spike/">public explainer</a> &middot;
+    <a href="https://github.com/rgb-protocol/rgb-consensus/issues/12">rgb-consensus#12</a>
+  </div>
+</div>
+
+</body>
+</html>
